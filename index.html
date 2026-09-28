@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ChatGPT</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;margin:0;padding:0;background:#fff;color:#000;overflow:hidden;
+font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,Arial,sans-serif;}
+body{position:relative;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+
+/* HEADER */
+.header{position:absolute;top:env(safe-area-inset-top,0px);left:0;right:0;height:52px;
+display:flex;align-items:center;z-index:20;background:#fff;
+border-bottom:1px solid #e7e7e9;padding:0 16px;direction:ltr;}
+.header-spacer{flex:1;}
+.header-title{font-size:19px;font-weight:700;letter-spacing:-0.3px;color:#1c1c1e;}
+.header-left{display:flex;align-items:center;flex-direction:row;gap:22px;direction:ltr;flex:0 0 auto;}
+.header-right-group{display:flex;align-items:center;gap:10px;direction:ltr;flex:0 0 auto;}
+.header-icon{width:22px;height:22px;stroke:#000;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+.dots{width:20px;height:20px;fill:#000;stroke:none;}
+
+/* CHAT */
+.chat{position:absolute;top:calc(52px + env(safe-area-inset-top,0px));left:0;right:0;
+bottom:78px;overflow-y:auto;overflow-x:hidden;padding:24px 18px 20px;display:flex;
+flex-direction:column;gap:28px;direction:ltr;scrollbar-width:none;background:#fff;}
+.chat::-webkit-scrollbar{display:none;}
+
+/* USER MESSAGE */
+.user{align-self:flex-start;max-width:78%;padding:13px 20px;background:#e8f3ff;
+border-radius:20px;color:#1173d4;font-size:17px;font-weight:500;line-height:1.4;
+direction:rtl;flex-shrink:0;}
+
+/* ASSISTANT */
+.assistant{align-self:flex-start;width:100%;color:#000;font-size:17px;font-weight:500;
+line-height:1.6;text-align:right;direction:rtl;}
+.ai-text{display:block;width:100%;}
+
+/* ACTIONS */
+.actions{width:100%;margin-top:12px;display:flex;justify-content:flex-end;
+align-items:center;gap:24px;direction:ltr;}
+.action{width:22px;height:22px;stroke:#6b6b70;fill:none;stroke-width:2.1;
+stroke-linecap:round;stroke-linejoin:round;}
+.dots-action{font-size:20px;font-weight:700;color:#6b6b70;letter-spacing:1px;line-height:1;}
+
+/* BOTTOM INPUT */
+.bottom{position:absolute;left:0;right:0;bottom:0;padding:0 14px calc(14px + env(safe-area-inset-bottom,0px));
+background:#fff;z-index:30;}
+.inputbar{width:100%;height:56px;background:#efeff0;border-radius:28px;display:flex;
+align-items:center;direction:ltr;padding:5px 6px 5px 3px;gap:12px;overflow:visible;}
+.voice{width:48px;height:48px;min-width:48px;border-radius:50%;background:#0a84ff;
+display:flex;align-items:center;justify-content:center;cursor:pointer;
+box-shadow:0 0 0 4px #efeff0;margin-left:2px;}
+.voice svg{width:23px;height:23px;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;}
+.voice .wave-icon{display:flex;}
+.voice .send-icon{display:none;}
+.mic{width:25px;height:25px;min-width:25px;fill:none;stroke:#000;stroke-width:2;
+stroke-linecap:round;stroke-linejoin:round;}
+.input{min-width:0;flex:1;width:0;border:none;outline:none;background:transparent;
+color:#000;font-family:inherit;font-size:17px;font-weight:600;text-align:right;
+direction:rtl;white-space:nowrap;overflow:hidden;text-overflow:clip;}
+.input::placeholder{color:#9a9a9e;opacity:1;}
+.plus{width:28px;min-width:28px;height:28px;display:flex;align-items:center;
+justify-content:center;color:#000;font-size:28px;font-weight:300;line-height:1;}
+
+/* LOGIN */
+.login{position:fixed;inset:0;z-index:100;background:#fff;display:none;align-items:center;justify-content:center;padding:24px;direction:rtl;}
+.login.show{display:flex;}
+.login-card{width:100%;max-width:340px;text-align:center;}
+.login-card h1{font-size:26px;margin:0 0 6px;color:#1c1c1e;}
+.login-card p{color:#6b6b70;margin:0 0 26px;font-size:15px;}
+.login-card input{width:100%;height:52px;border:none;background:#efeff0;border-radius:26px;padding:0 20px;font-size:17px;font-family:inherit;text-align:right;outline:none;margin-bottom:12px;}
+.login-card button{width:100%;height:52px;border:none;border-radius:26px;background:#0a84ff;color:#fff;font-size:17px;font-weight:600;font-family:inherit;}
+.login-or{margin:18px 0;color:#9a9a9e;font-size:14px;}
+#gbtn{display:flex;justify-content:center;}
+.login-err{color:#d70015;font-size:14px;min-height:20px;margin-top:10px;}
+
+/* إصلاح الكيبورد على iOS */
+html{height:100%;overflow:hidden;}
+body{position:fixed;top:0;left:0;width:100%;height:var(--vh,100%);}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <svg class="dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+    <svg class="header-icon" viewBox="0 0 24 24"><path d="M11 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6"/><path d="M18.4 2.6a2 2 0 0 1 2.8 2.8L12 14.6l-3.8 1 1-3.8z"/></svg>
+  </div>
+  <div class="header-spacer"></div>
+  <div class="header-right-group">
+    <div class="header-title">ChatGPT</div>
+    <svg class="header-icon" viewBox="0 0 24 24" stroke-width="2.6"><line x1="4" y1="8" x2="20" y2="8"/><line x1="9" y1="15" x2="20" y2="15"/></svg>
+  </div>
+</header>
+
+<main class="chat" id="chat"></main>
+
+<div class="bottom">
+  <div class="inputbar">
+    <div class="voice" id="voice">
+      <svg class="wave-icon" viewBox="0 0 24 24"><line x1="4" y1="12" x2="4" y2="12"/><line x1="8.5" y1="8" x2="8.5" y2="16"/><line x1="13" y1="5" x2="13" y2="19"/><line x1="17.5" y1="8" x2="17.5" y2="16"/><line x1="22" y1="12" x2="22" y2="12"/></svg>
+      <svg class="send-icon" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+    </div>
+    <svg class="mic" id="mic" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+    <input id="input" class="input" type="text" placeholder="اسأل ChatGPT" autocomplete="off">
+    <div class="plus" id="plus">+</div>
+  </div>
+</div>
+
+
+<div class="login" id="login">
+  <div class="login-card">
+    <h1>مرحباً 👋</h1>
+    <p>سجّل دخولك للبدء بالمحادثة</p>
+    <button id="gbtn" style="background:#fff;color:#1c1c1e;border:1px solid #d8d8dc">الدخول بحساب جوجل</button>
+    <div class="login-or" id="gor">أو</div>
+    <input id="gname" placeholder="اكتب اسمك" maxlength="40">
+    <button id="gbtnName">دخول</button>
+    <div class="login-err" id="gerr"></div>
+  </div>
+</div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signInAnonymously,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {getFirestore,doc,setDoc,updateDoc,addDoc,deleteDoc,getDoc,getDocs,collection,query,orderBy,onSnapshot,serverTimestamp,increment} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+const firebaseConfig={apiKey:"AIzaSyBk_hr_RSYRjTQww2KPwQcq42V1NzU7uH4",authDomain:"the-ai-ed920.firebaseapp.com",projectId:"the-ai-ed920",storageBucket:"the-ai-ed920.firebasestorage.app",messagingSenderId:"561611455865",appId:"1:561611455865:web:bb13aabf00f9f3eacf43a8"};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+async function googleLogin(){
+  const p=new GoogleAuthProvider();
+  try{await signInWithPopup(auth,p);}
+  catch(e){
+    if(e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment"){try{await signInWithRedirect(auth,p);return;}catch(e2){e=e2;}}
+    throw e;
+  }
+}
+
+const input=document.getElementById("input"),voice=document.getElementById("voice"),chat=document.getElementById("chat");
+const waveIcon=voice.querySelector(".wave-icon"),sendIcon=voice.querySelector(".send-icon");
+const loginEl=document.getElementById("login"),gerr=document.getElementById("gerr");
+const FALLBACK="استلمت رسالتك 🌷 سيرد عليك المشرف قريباً.";
+const ACTIONS=`<div class="actions"><div class="dots-action">•••</div>
+<svg class="action" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/><path d="M5 15v2a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-2"/></svg>
+<svg class="action" viewBox="0 0 24 24"><path d="M7 10v10"/><path d="M7 10l3-7a2 2 0 0 1 2 2v4h6a2 2 0 0 1 2 2.2l-1.2 7A2 2 0 0 1 17 20H7"/><path d="M7 20H4a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1h3"/></svg>
+<svg class="action" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></div>`;
+
+let isSendMode=false,uid=null,unsub=null,beat=null;
+function toggleSend(h){isSendMode=h;waveIcon.style.display=h?"none":"flex";sendIcon.style.display=h?"flex":"none";}
+input.addEventListener("input",()=>toggleSend(input.value.trim()!==""));
+voice.addEventListener("pointerdown",e=>{e.preventDefault();if(isSendMode)sendMessage();});
+input.addEventListener("keydown",e=>{if(e.key==="Enter")sendMessage();});
+
+// إصلاح الكيبورد على iOS
+const vv=window.visualViewport;
+function fit(){if(!vv)return;document.documentElement.style.setProperty("--vh",vv.height+"px");document.body.style.top=vv.offsetTop+"px";window.scrollTo(0,0);chat.scrollTop=chat.scrollHeight;}
+if(vv){vv.addEventListener("resize",fit);vv.addEventListener("scroll",fit);}
+input.addEventListener("focus",()=>setTimeout(fit,300));fit();
+
+function addMsg(m){
+  const el=document.createElement("div");
+  if(m.from==="user"){el.className="user";el.textContent=m.text;}
+  else{
+    el.className="assistant";
+    const t=document.createElement("div");t.className="ai-text";
+    m.text.split("\n").forEach((line,i)=>{if(i)t.appendChild(document.createElement("br"));t.appendChild(document.createTextNode(line));});
+    el.appendChild(t);el.insertAdjacentHTML("beforeend",ACTIONS);
+  }
+  chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
+}
+const norm=s=>String(s).toLowerCase().replace(/[\u064B-\u065F]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه").replace(/ى/g,"ي");
+async function matchReply(text){
+  const t=norm(text);let best=null,len=0;
+  (await getDocs(collection(db,"replies"))).forEach(d=>{
+    const r=d.data();
+    r.keywords.split(/[,،\n]/).map(x=>norm(x.trim())).filter(Boolean).forEach(k=>{if(t.includes(k)&&k.length>len){best=r.answer;len=k.length;}});
+  });
+  return best;
+}
+async function sendMessage(){
+  const text=input.value.trim();
+  if(!text)return;
+  if(!uid){addMsg({from:"bot",text:"⚠️ سجّل الدخول أولاً."});return;}
+  input.value="";toggleSend(false);
+  try{
+    const mref=collection(db,"users",uid,"messages");
+    await addDoc(mref,{from:"user",text,at:serverTimestamp()});
+    await updateDoc(doc(db,"users",uid),{lastMessage:text,lastAt:Date.now(),unread:increment(1)});
+    const u=(await getDoc(doc(db,"users",uid))).data();
+    if(u.humanUntil&&u.humanUntil>Date.now())return;
+    const ans=await matchReply(text);
+    setTimeout(()=>addDoc(mref,{from:"bot",text:ans||FALLBACK,at:serverTimestamp()}),500);
+  }catch(e){addMsg({from:"bot",text:"⚠️ تعذر الإرسال ("+(e.code||e.message)+"). تأكد من نشر قواعد Firestore."});}
+}
+
+// تسجيل الدخول
+document.getElementById("gbtn").onclick=async()=>{
+  gerr.textContent="";
+  try{await googleLogin();}catch(e){gerr.textContent="تعذر الدخول بجوجل ("+(e.code||e.message)+")";}
+};
+document.getElementById("gbtnName").onclick=async()=>{
+  const n=document.getElementById("gname").value.trim();
+  if(!n){gerr.textContent="اكتب اسمك";return;}
+  localStorage.setItem("aiName",n);
+  try{await signInAnonymously(auth);}catch(e){gerr.textContent="تعذر الدخول ("+(e.code||e.message)+")";}
+};
+
+onAuthStateChanged(auth,async user=>{
+  if(unsub){unsub();unsub=null;} if(beat){clearInterval(beat);beat=null;}
+  if(!user){uid=null;loginEl.classList.add("show");return;}
+  uid=user.uid;
+  const name=user.displayName||localStorage.getItem("aiName")||"مستخدم";
+  try{
+    const ref=doc(db,"users",uid);
+    if(!(await getDoc(ref)).exists())await setDoc(ref,{name,email:user.email||"",photo:user.photoURL||"",createdAt:Date.now(),lastAt:Date.now(),lastSeen:Date.now(),unread:0,lastMessage:""});
+    else await updateDoc(ref,{name,email:user.email||"",photo:user.photoURL||"",lastSeen:Date.now()});
+    beat=setInterval(()=>updateDoc(ref,{lastSeen:Date.now()}).catch(()=>{}),30000);
+  }catch(e){gerr.textContent="خطأ في القاعدة ("+(e.code||e.message)+")";loginEl.classList.add("show");return;}
+  loginEl.classList.remove("show");
+  chat.innerHTML="";
+  unsub=onSnapshot(query(collection(db,"users",uid,"messages"),orderBy("at")),snap=>{
+    snap.docChanges().forEach(c=>{if(c.type==="added")addMsg(c.doc.data());});
+  });
+});
+</script>
+</body>
+</html>
