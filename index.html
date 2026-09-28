@@ -149,6 +149,18 @@ import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signInAnon
 import {getFirestore,doc,setDoc,updateDoc,addDoc,deleteDoc,getDoc,getDocs,collection,query,orderBy,onSnapshot,serverTimestamp,increment} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyBk_hr_RSYRjTQww2KPwQcq42V1NzU7uH4",authDomain:"the-ai-ed920.firebaseapp.com",projectId:"the-ai-ed920",storageBucket:"the-ai-ed920.firebasestorage.app",messagingSenderId:"561611455865",appId:"1:561611455865:web:bb13aabf00f9f3eacf43a8"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+function authMsg(e){
+  const c=e.code||"";
+  const m={
+    "auth/unauthorized-domain":"هذا الدومين غير مضاف في Firebase. أضف ("+location.hostname+") في Authentication ← Settings ← Authorized domains",
+    "auth/operation-not-allowed":"طريقة الدخول غير مفعّلة في Firebase (Authentication ← Sign-in method)",
+    "auth/popup-closed-by-user":"أُغلقت نافذة الدخول قبل الإكمال، حاول مرة أخرى",
+    "auth/cancelled-popup-request":"أُلغي الطلب، حاول مرة أخرى",
+    "auth/popup-blocked":"المتصفح منع نافذة جوجل، اسمح بالنوافذ المنبثقة",
+    "auth/network-request-failed":"لا يوجد اتصال بالإنترنت"
+  };
+  return m[c]||("تعذر الدخول ("+(c||e.message)+")");
+}
 async function googleLogin(){
   const p=new GoogleAuthProvider();
   try{await signInWithPopup(auth,p);}
@@ -178,7 +190,7 @@ function refreshIcon(){
 }
 function toggleSend(h){isSendMode=h;refreshIcon();}
 input.addEventListener("input",()=>toggleSend(input.value.trim()!==""));
-voice.addEventListener("pointerdown",e=>{e.preventDefault();if(generating){skip=true;return;}if(isSendMode)sendMessage();});
+voice.addEventListener("pointerdown",e=>{e.preventDefault();if(generating){skip=true;return;}if(isSendMode)sendMessage();else openVoice();});
 input.addEventListener("keydown",e=>{if(e.key==="Enter")sendMessage();});
 
 // إصلاح الكيبورد على iOS
@@ -220,17 +232,28 @@ async function playAssistant(m){
   generating=true;skip=false;refreshIcon();
   const el=document.createElement("div");el.className="assistant";
   const t=document.createElement("div");t.className="ai-text";el.appendChild(t);chat.appendChild(el);attach(t,m.att);
-  const spans=[];
-  (m.text||"").split("\n").forEach((line,i)=>{
-    if(i)t.appendChild(document.createElement("br"));
-    line.split(/(\s+)/).forEach(p=>{
-      if(!p)return;
-      if(/^\s+$/.test(p)){t.appendChild(document.createTextNode(p));return;}
-      const s=document.createElement("span");s.className="w";s.textContent=p;t.appendChild(s);spans.push(s);
-    });
-  });
-  updateDot();void t.offsetWidth;
-  for(const s of spans){s.classList.add("on");if(skip)continue;chat.scrollTop=chat.scrollHeight;await sleep(55);}
+  const full=(m.text||"").trim();
+  updateDot();
+  const short=full.length<=22||full.split(/\s+/).length<=3;
+  if(short){
+    // ردود قصيرة: تلاشي ناعم
+    const sp=document.createElement("span");sp.style.cssText="opacity:0;transition:opacity .9s ease";
+    full.split("\n").forEach((line,i)=>{if(i)sp.appendChild(document.createElement("br"));sp.appendChild(document.createTextNode(line));});
+    t.appendChild(sp);void sp.offsetWidth;sp.style.opacity="1";
+    for(let i=0;i<10&&!skip;i++)await sleep(90);
+  }else{
+    // ردود أطول: تأثير الآلة الكاتبة حرفاً حرفاً
+    let node=document.createTextNode("");t.appendChild(node);
+    const chars=Array.from(full);
+    const nl=()=>{t.appendChild(document.createElement("br"));node=document.createTextNode("");t.appendChild(node);};
+    for(let i=0;i<chars.length;i++){
+      if(skip){chars.slice(i).forEach(x=>{if(x==="\n")nl();else node.appendData(x);});break;}
+      const c=chars[i];
+      if(c==="\n")nl();else node.appendData(c);
+      chat.scrollTop=chat.scrollHeight;
+      await sleep(/[.،,؟?!]/.test(c)?220:(c===" "?30:24));
+    }
+  }
   el.insertAdjacentHTML("beforeend",ACTIONS);
   updateDot();chat.scrollTop=chat.scrollHeight;
   generating=false;refreshIcon();
@@ -245,6 +268,7 @@ async function matchReply(text){
     const r=d.data();
     r.keywords.split(/[,،\n]/).map(x=>norm(x.trim())).filter(Boolean).forEach(k=>{if(t.includes(k)&&k.length>len){best=r.answer;len=k.length;}});
   });
+  if(best&&best.includes("|||")){const v=best.split("|||").map(x=>x.trim()).filter(Boolean);best=v[Math.floor(Math.random()*v.length)];}
   return best;
 }
 async function sendMessage(){
@@ -268,14 +292,150 @@ async function sendMessage(){
 // تسجيل الدخول
 document.getElementById("gbtn").onclick=async()=>{
   gerr.textContent="";
-  try{await googleLogin();}catch(e){gerr.textContent="تعذر الدخول بجوجل ("+(e.code||e.message)+")";}
+  try{await googleLogin();}catch(e){gerr.textContent=authMsg(e);}
 };
 document.getElementById("gbtnName").onclick=async()=>{
   const n=document.getElementById("gname").value.trim();
   if(!n){gerr.textContent="اكتب اسمك";return;}
   localStorage.setItem("aiName",n);
-  try{await signInAnonymously(auth);}catch(e){gerr.textContent="تعذر الدخول ("+(e.code||e.message)+")";}
+  try{await signInAnonymously(auth);}catch(e){gerr.textContent=authMsg(e);}
 };
+
+// ===== الوضع الصوتي =====
+const VCFG={iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}]};
+const vst=document.createElement("style");
+vst.textContent=`
+.vo{position:fixed;left:0;top:0;width:100%;height:var(--vh,100%);background:#fff;z-index:500;display:none;direction:rtl;}
+.vo.show{display:block;}
+.vo-w,.vo-l{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding-top:env(safe-area-inset-top,0px);}
+.vo-x{position:absolute;left:18px;top:calc(env(safe-area-inset-top,0px) + 18px);width:44px;height:44px;border-radius:50%;border:none;background:#8e8e93;color:#fff;font-size:20px;font-weight:700;}
+.vo-title{margin-top:calc(env(safe-area-inset-top,0px) + 92px);font-size:32px;font-weight:800;color:#000;text-align:center;}
+.vo-ballwrap{width:230px;margin:auto;animation:breathe 4s ease-in-out infinite;}
+.vo-ballwrap.big{width:300px;}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.vo-ball{width:100%;aspect-ratio:1;border-radius:50%;background:radial-gradient(120% 90% at 75% 85%,#f4f5ff 0,#f2f3ff 38%,rgba(255,255,255,0) 62%),linear-gradient(180deg,#7b7cff 0%,#7f90ff 42%,#eef0ff 68%,#e2e6ff 100%);transition:transform .08s linear;}
+.vo-name{font-size:28px;font-weight:800;color:#000;}
+.vo-sub{font-size:18px;color:#8e8e93;margin-top:4px;}
+.vo-dots{display:flex;gap:14px;margin:26px 0 22px;direction:ltr;}
+.vo-dots i{width:10px;height:10px;border-radius:50%;background:#d8d8dc;}
+.vo-dots i.on{background:#000;}
+.vo-start{width:calc(100% - 44px);height:64px;border-radius:32px;border:none;background:#000;color:#fff;font-size:20px;font-weight:700;font-family:inherit;margin-bottom:calc(env(safe-area-inset-bottom,0px) + 34px);}
+.vo-head{width:100%;display:flex;justify-content:space-between;align-items:center;padding:16px 18px;height:52px;border-bottom:1px solid #eee;box-sizing:border-box;direction:ltr;}
+.vo-head svg{width:26px;height:26px;stroke:#000;fill:none;stroke-width:2.4;stroke-linecap:round;}
+.vo-status{margin-top:14px;color:#8e8e93;font-size:16px;min-height:22px;}
+.vo-bar{width:100%;display:flex;align-items:center;gap:12px;padding:0 14px calc(env(safe-area-inset-bottom,0px) + 14px);box-sizing:border-box;direction:ltr;}
+.vo-bar button{width:74px;height:74px;min-width:74px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;}
+.vo-end{background:#000;}
+.vo-mute{background:#efeff0;color:#000;}
+.vo-mute.red{background:#ff453a;color:#fff;}
+.vo-pill{flex:1;height:74px;border-radius:37px;background:#f2f2f3;display:flex;align-items:center;gap:14px;padding:0 22px;direction:rtl;font-size:22px;color:#8e8e93;}
+.vo-pill b{font-size:38px;font-weight:300;color:#000;}
+`;
+document.head.appendChild(vst);
+const vo=document.createElement("div");vo.className="vo";
+vo.innerHTML=`
+<div class="vo-w" id="voW">
+  <button class="vo-x" id="voClose">✕</button>
+  <div class="vo-title">تعرّف على Voice</div>
+  <div class="vo-ballwrap"><div class="vo-ball"></div></div>
+  <div class="vo-name">Sol</div><div class="vo-sub">ذكي وهادئ</div>
+  <div class="vo-dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="on"></i></div>
+  <button class="vo-start" id="voStart">ابدأ الوضع الصوتي</button>
+</div>
+<div class="vo-l" id="voL" style="display:none">
+  <div class="vo-head">
+    <svg viewBox="0 0 24 24"><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></svg>
+    <svg viewBox="0 0 24 24"><path d="M4 8h16M9 15h11"/></svg>
+  </div>
+  <div class="vo-status" id="voS"></div>
+  <div class="vo-ballwrap big"><div class="vo-ball" id="voBall"></div></div>
+  <div class="vo-bar">
+    <button class="vo-end" id="voEnd"><svg viewBox="0 0 24 24" width="34" height="34" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button class="vo-mute" id="voMute"><svg viewBox="0 0 24 24" width="30" height="30" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 12 5M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg></button>
+    <div class="vo-pill"><b>+</b><span>اسأل ChatGPT</span></div>
+  </div>
+</div>`;
+document.body.appendChild(vo);
+const vAud=document.createElement("audio");vAud.autoplay=true;vAud.setAttribute("playsinline","");document.body.appendChild(vAud);
+const $v=id=>document.getElementById(id);
+let vpc=null,vlocal=null,vcid=null,vUnsubCall=null,vUnsubCand=null,vLvl=null,vMuted=false,vPending=[],vEnded=true;
+const cj=c=>JSON.parse(JSON.stringify(c.toJSON()));
+function setVS(t){$v("voS").textContent=t;}
+function openVoice(){
+  if(!uid){toast("سجّل الدخول أولاً");return;}
+  vo.classList.add("show");$v("voW").style.display="flex";$v("voL").style.display="none";
+}
+$v("voClose").onclick=()=>vo.classList.remove("show");
+$v("voStart").onclick=startCall;
+$v("voEnd").onclick=()=>endCall(true);
+$v("voMute").onclick=()=>{
+  vMuted=!vMuted;
+  if(vlocal)vlocal.getAudioTracks().forEach(t=>t.enabled=!vMuted);
+  $v("voMute").classList.toggle("red",vMuted);
+};
+function watchLevel(stream){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const an=ctx.createAnalyser();an.fftSize=256;ctx.createMediaStreamSource(stream).connect(an);
+    const buf=new Uint8Array(an.frequencyBinCount);
+    clearInterval(vLvl);
+    vLvl=setInterval(()=>{
+      an.getByteTimeDomainData(buf);let s=0;
+      for(const v of buf){const x=(v-128)/128;s+=x*x;}
+      const l=Math.min(1,Math.sqrt(s/buf.length)*5);
+      $v("voBall").style.transform="scale("+(1+l*0.22)+")";
+    },60);
+  }catch(e){}
+}
+async function startCall(){
+  try{vlocal=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
+  catch(e){toast("لازم تسمح للمايكروفون");return;}
+  $v("voW").style.display="none";$v("voL").style.display="flex";
+  setVS("جارٍ الاتصال...");vMuted=false;$v("voMute").classList.remove("red");
+  vcid=Date.now().toString(36);vPending=[];vEnded=false;
+  vpc=new RTCPeerConnection(VCFG);
+  vlocal.getTracks().forEach(t=>vpc.addTrack(t,vlocal));
+  vpc.ontrack=e=>{vAud.srcObject=e.streams[0];vAud.play().catch(()=>{});watchLevel(e.streams[0]);};
+  vpc.onicecandidate=e=>{if(e.candidate)addDoc(collection(db,"calls",uid,"cand"),{...cj(e.candidate),cid:vcid,by:"u"}).catch(()=>{});};
+  vpc.onconnectionstatechange=()=>{
+    if(!vpc)return;
+    if(vpc.connectionState==="connected")setVS("متصل");
+    else if(vpc.connectionState==="failed")setVS("تعذر الاتصال، جرّب شبكة أخرى");
+  };
+  try{
+    const offer=await vpc.createOffer();await vpc.setLocalDescription(offer);
+    await setDoc(doc(db,"calls",uid),{status:"ringing",cid:vcid,name:localStorage.getItem("aiName")||(auth.currentUser&&auth.currentUser.displayName)||"مستخدم",offer:{type:offer.type,sdp:offer.sdp},answer:null,createdAt:Date.now()});
+  }catch(e){toast("تعذر بدء الاتصال ("+(e.code||e.message)+")");endCall(false);return;}
+  vUnsubCall=onSnapshot(doc(db,"calls",uid),async s=>{
+    const d=s.data();if(!d||d.cid!==vcid||!vpc)return;
+    if(d.answer&&!vpc.remoteDescription){
+      await vpc.setRemoteDescription(d.answer);
+      vPending.forEach(c=>vpc.addIceCandidate(c).catch(()=>{}));vPending=[];
+      setVS("جارٍ التوصيل...");
+    }
+    if(d.status==="ended")endCall(false);
+  });
+  vUnsubCand=onSnapshot(collection(db,"calls",uid,"cand"),snap=>snap.docChanges().forEach(ch=>{
+    if(ch.type!=="added")return;const c=ch.doc.data();
+    if(c.cid!==vcid||c.by!=="a")return;
+    const ice={candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex};
+    if(vpc&&vpc.remoteDescription)vpc.addIceCandidate(ice).catch(()=>{});else vPending.push(ice);
+  }));
+}
+function endCall(notify){
+  if(vEnded)return;vEnded=true;
+  if(notify)updateDoc(doc(db,"calls",uid),{status:"ended"}).catch(()=>{});
+  try{vpc&&vpc.close();}catch(e){}vpc=null;
+  if(vlocal)vlocal.getTracks().forEach(t=>t.stop());vlocal=null;
+  if(vUnsubCall)vUnsubCall();if(vUnsubCand)vUnsubCand();vUnsubCall=vUnsubCand=null;
+  clearInterval(vLvl);vAud.srcObject=null;
+  vo.classList.remove("show");
+}
+
+// ===== تسجيل الخروج / تبديل الحساب =====
+const menuDots=document.querySelector(".header .dots");
+menuDots.style.cursor="pointer";
+menuDots.addEventListener("click",()=>{if(confirm("تسجيل الخروج وتبديل الحساب؟"))signOut(auth);});
 
 // ===== إشعار صغير =====
 const toastEl=document.createElement("div");toastEl.className="toast";document.body.appendChild(toastEl);
@@ -346,6 +506,7 @@ async function handleFile(file){
 onAuthStateChanged(auth,async user=>{
   if(unsubU){unsubU();unsubU=null;} if(unsub){unsub();unsub=null;} if(beat){clearInterval(beat);beat=null;}
   if(!user){uid=null;loginEl.classList.add("show");return;}
+  if(user.providerData.some(p=>p.providerId==="password")){await signOut(auth);return;}
   uid=user.uid;
   const name=user.displayName||localStorage.getItem("aiName")||"مستخدم";
   try{
