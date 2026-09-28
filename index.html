@@ -79,6 +79,14 @@ justify-content:center;color:#000;font-size:28px;font-weight:300;line-height:1;}
 /* إصلاح الكيبورد على iOS */
 html{height:100%;overflow:hidden;}
 body{position:fixed;top:0;left:0;width:100%;height:var(--vh,100%);}
+
+/* النقطة الزرقاء + ظهور الكلمات تدريجياً */
+.dotwrap{align-self:flex-start;width:100%;display:flex;justify-content:flex-end;padding:4px 4px 0;}
+.tdot{width:16px;height:16px;border-radius:50%;background:#3399ff;animation:pulse 1s ease-in-out infinite;}
+@keyframes pulse{0%,100%{transform:scale(.7);opacity:.6}50%{transform:scale(1.15);opacity:1}}
+.w{opacity:0;filter:blur(3px);transition:opacity .9s ease,filter .9s ease;}
+.w.on{opacity:1;filter:none;}
+.voice .stop-icon{display:none;width:18px;height:18px;background:#fff;border-radius:4px;}
 </style>
 </head>
 <body>
@@ -146,9 +154,17 @@ const ACTIONS=`<div class="actions"><div class="dots-action">•••</div>
 <svg class="action" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></div>`;
 
 let isSendMode=false,uid=null,unsub=null,beat=null;
-function toggleSend(h){isSendMode=h;waveIcon.style.display=h?"none":"flex";sendIcon.style.display=h?"flex":"none";}
+voice.insertAdjacentHTML("beforeend",'<div class="stop-icon"></div>');
+const stopIcon=voice.querySelector(".stop-icon");
+let generating=false,skip=false,loaded=false,unsubU=null,waiting=0,adminTyping=false,typingSafety=null,dotEl=null,chainP=Promise.resolve();
+function refreshIcon(){
+  waveIcon.style.display=(!generating&&!isSendMode)?"flex":"none";
+  sendIcon.style.display=(!generating&&isSendMode)?"flex":"none";
+  stopIcon.style.display=generating?"block":"none";
+}
+function toggleSend(h){isSendMode=h;refreshIcon();}
 input.addEventListener("input",()=>toggleSend(input.value.trim()!==""));
-voice.addEventListener("pointerdown",e=>{e.preventDefault();if(isSendMode)sendMessage();});
+voice.addEventListener("pointerdown",e=>{e.preventDefault();if(generating){skip=true;return;}if(isSendMode)sendMessage();});
 input.addEventListener("keydown",e=>{if(e.key==="Enter")sendMessage();});
 
 // إصلاح الكيبورد على iOS
@@ -167,6 +183,38 @@ function addMsg(m){
     el.appendChild(t);el.insertAdjacentHTML("beforeend",ACTIONS);
   }
   chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function updateDot(){
+  if(waiting>0||adminTyping){
+    if(!dotEl){dotEl=document.createElement("div");dotEl.className="dotwrap";dotEl.innerHTML='<div class="tdot"></div>';}
+    chat.appendChild(dotEl);chat.scrollTop=chat.scrollHeight;
+  }else if(dotEl&&dotEl.parentNode){dotEl.remove();}
+}
+async function playAssistant(m){
+  waiting++;updateDot();
+  await sleep(m.from==="admin"?600:300);
+  waiting--;updateDot();
+  generating=true;skip=false;refreshIcon();
+  const el=document.createElement("div");el.className="assistant";
+  const t=document.createElement("div");t.className="ai-text";el.appendChild(t);chat.appendChild(el);
+  const spans=[];
+  m.text.split("\n").forEach((line,i)=>{
+    if(i)t.appendChild(document.createElement("br"));
+    line.split(/(\s+)/).forEach(p=>{
+      if(!p)return;
+      if(/^\s+$/.test(p)){t.appendChild(document.createTextNode(p));return;}
+      const s=document.createElement("span");s.className="w";s.textContent=p;t.appendChild(s);spans.push(s);
+    });
+  });
+  updateDot();void t.offsetWidth;
+  for(const s of spans){s.classList.add("on");if(skip)continue;chat.scrollTop=chat.scrollHeight;await sleep(70);}
+  el.insertAdjacentHTML("beforeend",ACTIONS);
+  updateDot();chat.scrollTop=chat.scrollHeight;
+  generating=false;refreshIcon();
+}
+function enqueue(m,instant){
+  chainP=chainP.then(()=>(instant||m.from==="user")?addMsg(m):playAssistant(m)).catch(()=>{});
 }
 const norm=s=>String(s).toLowerCase().replace(/[\u064B-\u065F]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه").replace(/ى/g,"ي");
 async function matchReply(text){
@@ -189,7 +237,9 @@ async function sendMessage(){
     const u=(await getDoc(doc(db,"users",uid))).data();
     if(u.humanUntil&&u.humanUntil>Date.now())return;
     const ans=await matchReply(text);
-    setTimeout(()=>addDoc(mref,{from:"bot",text:ans||FALLBACK,at:serverTimestamp()}),500);
+    waiting++;updateDot();
+    try{await sleep(900);await addDoc(mref,{from:"bot",text:ans||FALLBACK,at:serverTimestamp()});}
+    finally{waiting--;updateDot();}
   }catch(e){addMsg({from:"bot",text:"⚠️ تعذر الإرسال ("+(e.code||e.message)+"). تأكد من نشر قواعد Firestore."});}
 }
 
@@ -206,7 +256,7 @@ document.getElementById("gbtnName").onclick=async()=>{
 };
 
 onAuthStateChanged(auth,async user=>{
-  if(unsub){unsub();unsub=null;} if(beat){clearInterval(beat);beat=null;}
+  if(unsubU){unsubU();unsubU=null;} if(unsub){unsub();unsub=null;} if(beat){clearInterval(beat);beat=null;}
   if(!user){uid=null;loginEl.classList.add("show");return;}
   uid=user.uid;
   const name=user.displayName||localStorage.getItem("aiName")||"مستخدم";
@@ -217,9 +267,18 @@ onAuthStateChanged(auth,async user=>{
     beat=setInterval(()=>updateDoc(ref,{lastSeen:Date.now()}).catch(()=>{}),30000);
   }catch(e){gerr.textContent="خطأ في القاعدة ("+(e.code||e.message)+")";loginEl.classList.add("show");return;}
   loginEl.classList.remove("show");
-  chat.innerHTML="";
+  chat.innerHTML="";loaded=false;chainP=Promise.resolve();
   unsub=onSnapshot(query(collection(db,"users",uid,"messages"),orderBy("at")),snap=>{
-    snap.docChanges().forEach(c=>{if(c.type==="added")addMsg(c.doc.data());});
+    const first=!loaded;
+    snap.docChanges().forEach(c=>{if(c.type==="added")enqueue(c.doc.data(),first);});
+    loaded=true;
+  });
+  unsubU=onSnapshot(doc(db,"users",uid),s=>{
+    const d=s.data()||{};
+    adminTyping=!!d.typing;
+    clearTimeout(typingSafety);
+    if(adminTyping)typingSafety=setTimeout(()=>{adminTyping=false;updateDot();},8000);
+    updateDot();
   });
 });
 </script>
