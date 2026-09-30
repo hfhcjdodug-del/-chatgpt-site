@@ -287,10 +287,6 @@ html.worm .vo-ball{background:radial-gradient(120% 90% at 75% 85%,#ffb3b3 0,#ff6
 .vic-row button{flex:1;height:50px;border-radius:25px;border:none;font-size:16px;font-weight:700;font-family:inherit;}
 .vic-dec{background:var(--bar,#efeff0);color:#ff3b30;}
 .vic-acc{background:#0a84ff;color:#fff;}
-.vic-active{position:fixed;left:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:120;background:#000;border-radius:16px;padding:8px;display:none;flex-direction:column;gap:6px;direction:rtl;box-shadow:0 8px 30px rgba(0,0,0,.35);}
-.vic-active.show{display:flex;}
-.vic-active video{width:140px;border-radius:12px;display:block;background:#111;}
-.vic-active button{height:34px;border-radius:12px;border:none;background:#ff3b30;color:#fff;font-size:13px;font-weight:700;font-family:inherit;}
 </style>
 </head>
 <body>
@@ -376,10 +372,6 @@ html.worm .vo-ball{background:radial-gradient(120% 90% at 75% 85%,#ffb3b3 0,#ff6
       <button class="vic-acc" id="vicAcc">قبول</button>
     </div>
   </div>
-</div>
-<div class="vic-active" id="vicActive">
-  <video id="vicLocalVideo" autoplay playsinline muted></video>
-  <button id="vicEnd">إنهاء مكالمة الفيديو</button>
 </div>
 <div class="editor" id="editor">
   <div class="ed-head"><button id="edCancel">إلغاء</button><b>الكتابة أو التحرير</b><button id="edDone">تم</button></div>
@@ -551,6 +543,7 @@ async function matchReply(text){
 async function sendMessage(){
   const text=input.value.trim();
   if(!text)return;
+  if(isStopCmd(text)&&(vicActive||vicPc)){input.value="";toggleSend(false);vicEndCall(true);return;}
   if(!uid){addMsg({from:"bot",text:"⚠️ سجّل الدخول أولاً."});return;}
   input.value="";toggleSend(false);
   try{
@@ -865,8 +858,9 @@ function stopRecog(){
 
 // ===== استقبال طلب مكالمة الفيديو من لوحة التحكم (يتطلب قبول المستخدم) =====
 let vicPc=null,vicLocal=null,vicCid=null,vicCandUnsub=null,vicActive=false,vicReqSeen=null,vicBusy=false;
-const vicEl=document.getElementById("vic"),vicActiveEl=document.getElementById("vicActive");
+const vicEl=document.getElementById("vic");
 function vicShowIncoming(){if(vicActive||vicBusy)return;vicEl.classList.add("show");}
+function isStopCmd(t){return t.trim().toLowerCase()==="/stop";}
 function vicHideIncoming(){vicEl.classList.remove("show");}
 document.getElementById("vicDec").onclick=async()=>{
   vicHideIncoming();
@@ -878,8 +872,7 @@ document.getElementById("vicAcc").onclick=async()=>{
   try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:{echoCancellation:true,noiseSuppression:true}});}
   catch(e){toast("لازم تسمح للكاميرا والمايكروفون");vicBusy=false;return;}
   vicLocal=stream;
-  document.getElementById("vicLocalVideo").srcObject=stream;
-  vicActive=true;vicActiveEl.classList.add("show");vicBusy=false;
+  vicActive=true;vicBusy=false;
   vicCid=Date.now().toString(36);
   try{
     vicPc=new RTCPeerConnection(VCFG);
@@ -897,14 +890,13 @@ document.getElementById("vicAcc").onclick=async()=>{
 };
 function vicEndCall(notify){
   if(!vicActive&&!vicPc)return;
-  vicActive=false;vicActiveEl.classList.remove("show");
+  vicActive=false;
   if(notify)updateDoc(doc(db,"calls",uid),{videoStatus:"ended",videoOffer:null,videoAnswer:null,videoReq:null}).catch(()=>{});
   try{vicPc&&vicPc.close();}catch(e){}vicPc=null;
   if(vicLocal)vicLocal.getTracks().forEach(t=>t.stop());vicLocal=null;
   if(vicCandUnsub)vicCandUnsub();vicCandUnsub=null;
-  document.getElementById("vicLocalVideo").srcObject=null;vicCid=null;
+  vicCid=null;
 }
-document.getElementById("vicEnd").onclick=()=>vicEndCall(true);
 function watchVideoReq(d){
   if(d.videoReq&&d.videoReq.at!==vicReqSeen&&!vicActive){vicReqSeen=d.videoReq.at;vicShowIncoming();}
   if(!d.videoReq)vicHideIncoming();
