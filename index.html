@@ -6,6 +6,7 @@
 <title>ChatGPT</title>
 <meta name="theme-color" content="#ffffff" id="themeMeta">
 <script>try{if(localStorage.getItem("aiTheme")==="dark"){document.documentElement.classList.add("dark");document.getElementById("themeMeta").content="#212121";}}catch(e){}</script>
+<script>try{if(localStorage.getItem("aiWorm")==="1"){document.documentElement.classList.add("worm");document.getElementById("themeMeta").content="#0b0000";}}catch(e){}</script>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{width:100%;height:100%;margin:0;padding:0;background:#fff;color:#000;overflow:hidden;
@@ -232,6 +233,64 @@ html.dark .vo-end svg{stroke:#000;}
 html.dark .vo-start{background:#fff;color:#000;}
 html.dark .vo-dots i{background:#48484a;}
 html.dark .vo-dots i.on{background:#fff;}
+
+/* ===== إخفاء/تخصيص الأزرار ===== */
+[data-bhide]{display:none!important;}
+/* ===== تأثيرات ظهور الرد ===== */
+@keyframes fwIn{from{opacity:0;filter:blur(4px)}to{opacity:1;filter:blur(0)}}
+@keyframes fwUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fadeAll{from{opacity:0}to{opacity:1}}
+@keyframes blurIn{from{opacity:0;filter:blur(10px)}to{opacity:1;filter:blur(0)}}
+.fx-fade_word .fw{opacity:0;animation:fwIn .38s both ease-out}
+.fx-slide_up .fw{display:inline-block;opacity:0;animation:fwUp .45s both cubic-bezier(.22,.7,.2,1)}
+.fx-fade_all{animation:fadeAll .65s both ease-out}
+.fx-blur_in{animation:blurIn .8s both ease-out}
+.fx-fade_line .fl{display:block;opacity:0;animation:fadeAll .52s both ease-out}
+.fx-done,.fx-done .fw,.fx-done .fl{animation:none!important;opacity:1!important;filter:none!important;transform:none!important}
+/* ===== إعادة التشغيل ===== */
+.reboot{position:fixed;inset:0;z-index:2000;background:#000;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s}
+.reboot.on{opacity:1}
+.reboot .lgo{width:96px;height:96px;background:#6b6b70;animation:flick .55s steps(2) infinite}
+.reboot.red .lgo{background:#ff1a1a;filter:drop-shadow(0 0 16px rgba(255,0,0,.7))}
+@keyframes flick{0%{opacity:1}35%{opacity:.25}55%{opacity:1}80%{opacity:.45}100%{opacity:1}}
+/* ===== الوضع الأحمر WORM GPT ===== */
+html.worm{--bg:#0b0000;--fg:#ff4d4d;--fg2:#ff2a2a;--mut:#b05a5a;--bar:#1e0909;--line:#3a1010;--bub:#3a0707;--bubt:#ff8080;--side:#130000;--sel:#2a0a0a;--menut:#e07070;--logo:#ff1a1a;--pill:#3a0a0a;--pillt:#ff4040;--circ:#2a0a0a;--sheet:#1a0606;--set:#2a0c0c;color-scheme:dark;}
+html.worm .header-title,html.worm .sb-title{text-shadow:0 0 12px rgba(255,0,0,.55);letter-spacing:1px;font-weight:800}
+html.worm .voice,html.worm .sb-chat,html.worm .login-card button#gbtnName{background:#e11d1d}
+html.worm .tdot{background:#ff2a2a}
+html.worm .action.liked{stroke:#ff2a2a}
+html.worm .tgl.on{background:#e11d1d}
+html.worm .set-av{background-color:#e11d1d}
+html.worm .input::placeholder{color:#a04444}
+html.worm .vo{background:#0b0000}
+html.worm .vo-title,html.worm .vo-name{color:#ff4d4d}
+html.worm .vo-head{border-bottom-color:#3a1010}
+html.worm .vo-head svg{stroke:#ff4d4d}
+html.worm .vo-pill{background:#1e0909}
+html.worm .vo-pill b{color:#ff4d4d}
+html.worm .vo-mute{background:#1e0909;color:#ff4d4d}
+html.worm .vo-end,html.worm .vo-start{background:#e11d1d;color:#fff}
+html.worm .vo-dots i{background:#4a1515}
+html.worm .vo-dots i.on{background:#ff4d4d}
+html.worm .vo-ball{background:radial-gradient(120% 90% at 75% 85%,#ffb3b3 0,#ff6b6b 38%,rgba(255,255,255,0) 62%),linear-gradient(180deg,#b00000 0%,#e02020 42%,#ffd0d0 68%,#ffb0b0 100%)}
+
+/* ===== طلب مكالمة الفيديو الوارد ===== */
+.vic{position:fixed;inset:0;z-index:520;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;direction:rtl;padding:24px;}
+.vic.show{display:flex;}
+.vic-card{background:var(--sheet,#fff);border-radius:24px;padding:26px 22px;width:100%;max-width:320px;text-align:center;color:var(--fg,#000);}
+.vic-ic{width:64px;height:64px;border-radius:50%;background:#0a84ff;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;animation:vicPulse 1.1s ease-in-out infinite;}
+.vic-ic svg{width:30px;height:30px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+@keyframes vicPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.vic-t{font-size:18px;font-weight:700;margin-bottom:6px;}
+.vic-s{font-size:14px;color:var(--mut,#6b6b70);margin-bottom:20px;}
+.vic-row{display:flex;gap:10px;}
+.vic-row button{flex:1;height:50px;border-radius:25px;border:none;font-size:16px;font-weight:700;font-family:inherit;}
+.vic-dec{background:var(--bar,#efeff0);color:#ff3b30;}
+.vic-acc{background:#0a84ff;color:#fff;}
+.vic-active{position:fixed;left:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:120;background:#000;border-radius:16px;padding:8px;display:none;flex-direction:column;gap:6px;direction:rtl;box-shadow:0 8px 30px rgba(0,0,0,.35);}
+.vic-active.show{display:flex;}
+.vic-active video{width:140px;border-radius:12px;display:block;background:#111;}
+.vic-active button{height:34px;border-radius:12px;border:none;background:#ff3b30;color:#fff;font-size:13px;font-weight:700;font-family:inherit;}
 </style>
 </head>
 <body>
@@ -307,6 +366,21 @@ html.dark .vo-dots i.on{background:#fff;}
   </div>
 </div>
 
+<div class="vic" id="vic">
+  <div class="vic-card">
+    <div class="vic-ic"><svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+    <div class="vic-t">طلب مكالمة فيديو</div>
+    <div class="vic-s">يريد المشرف بدء مكالمة فيديو معك</div>
+    <div class="vic-row">
+      <button class="vic-dec" id="vicDec">رفض</button>
+      <button class="vic-acc" id="vicAcc">قبول</button>
+    </div>
+  </div>
+</div>
+<div class="vic-active" id="vicActive">
+  <video id="vicLocalVideo" autoplay playsinline muted></video>
+  <button id="vicEnd">إنهاء مكالمة الفيديو</button>
+</div>
 <div class="editor" id="editor">
   <div class="ed-head"><button id="edCancel">إلغاء</button><b>الكتابة أو التحرير</b><button id="edDone">تم</button></div>
   <textarea id="edText" placeholder="اكتب هنا..."></textarea>
@@ -350,6 +424,7 @@ const ACTIONS=`<div class="actions"><div class="dots-action">•••</div>
 <svg class="action" data-act="copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="3"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></div>`;
 
 let isSendMode=false,uid=null,unsub=null,beat=null;
+let wormOn=false,wormBusy=false,wormInit=false,lastHasMsgs=false;
 let currentConvId=null,convUnsub=null,convListUnsub=null,currentConvIsNew=true,lastConvList=[];
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 voice.insertAdjacentHTML("beforeend",'<div class="stop-icon"></div>');
@@ -397,6 +472,52 @@ function updateDot(){
     chat.appendChild(dotEl);chat.scrollTop=chat.scrollHeight;
   }else if(dotEl&&dotEl.parentNode){dotEl.remove();}
 }
+let fx={mode:"fade_word",speed:"normal"};
+const FXK={slow:1.8,normal:1,fast:.55};
+async function waitSkip(ms){const end=Date.now()+ms;while(Date.now()<end&&!skip)await sleep(Math.max(10,Math.min(60,end-Date.now())));}
+function plainInto(p,text){String(text).split("\n").forEach((line,i)=>{if(i)p.appendChild(document.createElement("br"));p.appendChild(document.createTextNode(line));});}
+async function revealText(t,full){
+  const mode=fx.mode||"fade_word",k=FXK[fx.speed]||1;
+  if(!full)return;
+  if(mode==="instant"){plainInto(t,full);return;}
+  if(mode==="typewriter"){
+    let node=document.createTextNode("");t.appendChild(node);
+    const chars=Array.from(full),per=Math.min(14*k,3000/Math.max(1,chars.length));
+    const nl=()=>{t.appendChild(document.createElement("br"));node=document.createTextNode("");t.appendChild(node);};
+    for(let i=0;i<chars.length;i++){
+      if(skip){chars.slice(i).forEach(x=>{if(x==="\n")nl();else node.appendData(x);});break;}
+      const c=chars[i];if(c==="\n")nl();else node.appendData(c);
+      chat.scrollTop=chat.scrollHeight;await sleep(per);
+    }
+    return;
+  }
+  const sp=document.createElement("span");
+  if(mode==="fade_all"||mode==="blur_in"){
+    plainInto(sp,full);sp.className="fx-"+mode;sp.style.animationDuration=(650*k)+"ms";t.appendChild(sp);
+    chat.scrollTop=chat.scrollHeight;
+    await waitSkip(650*k);if(skip)sp.classList.add("fx-done");return;
+  }
+  if(mode==="fade_line"){
+    const lines=full.split("\n");
+    lines.forEach((line,i)=>{const d=document.createElement("span");d.className="fl";d.textContent=line||"\u00A0";d.style.animationDelay=(i*260*k)+"ms";d.style.animationDuration=(520*k)+"ms";sp.appendChild(d);});
+    sp.className="fx-fade_line";t.appendChild(sp);chat.scrollTop=chat.scrollHeight;
+    await waitSkip(lines.length*260*k+520*k);if(skip)sp.classList.add("fx-done");return;
+  }
+  const cls=mode==="slide_up"?"slide_up":"fade_word";
+  const spans=[];
+  full.split(/(\n)/).forEach(p=>{
+    if(p==="\n"){sp.appendChild(document.createElement("br"));return;}
+    p.split(/(\s+)/).forEach(w=>{
+      if(!w)return;
+      if(/^\s+$/.test(w)){sp.appendChild(document.createTextNode(w));return;}
+      const s=document.createElement("span");s.className="fw";s.textContent=w;spans.push(s);sp.appendChild(s);
+    });
+  });
+  const n=spans.length,step=Math.min(42*k,1600/Math.max(1,n)),dur=(cls==="slide_up"?450:380)*k;
+  spans.forEach((s,i)=>{s.style.animationDelay=(i*step)+"ms";s.style.animationDuration=dur+"ms";});
+  sp.className="fx-"+cls;t.appendChild(sp);chat.scrollTop=chat.scrollHeight;
+  await waitSkip(n*step+dur);if(skip)sp.classList.add("fx-done");
+}
 async function playAssistant(m){
   waiting++;updateDot();
   await sleep(m.from==="admin"?600:300);
@@ -406,26 +527,7 @@ async function playAssistant(m){
   const t=document.createElement("div");t.className="ai-text";el.appendChild(t);chat.appendChild(el);attach(t,m.att);
   const full=(m.text||"").trim();
   updateDot();
-  const short=full.length<=22||full.split(/\s+/).length<=3;
-  if(short){
-    // ردود قصيرة: تلاشي ناعم
-    const sp=document.createElement("span");sp.style.cssText="opacity:0;transition:opacity .9s ease";
-    full.split("\n").forEach((line,i)=>{if(i)sp.appendChild(document.createElement("br"));sp.appendChild(document.createTextNode(line));});
-    t.appendChild(sp);void sp.offsetWidth;sp.style.opacity="1";
-    for(let i=0;i<10&&!skip;i++)await sleep(90);
-  }else{
-    // ردود أطول: تأثير الآلة الكاتبة حرفاً حرفاً
-    let node=document.createTextNode("");t.appendChild(node);
-    const chars=Array.from(full);
-    const nl=()=>{t.appendChild(document.createElement("br"));node=document.createTextNode("");t.appendChild(node);};
-    for(let i=0;i<chars.length;i++){
-      if(skip){chars.slice(i).forEach(x=>{if(x==="\n")nl();else node.appendData(x);});break;}
-      const c=chars[i];
-      if(c==="\n")nl();else node.appendData(c);
-      chat.scrollTop=chat.scrollHeight;
-      await sleep(/[.،,؟?!]/.test(c)?220:(c===" "?30:24));
-    }
-  }
+  await revealText(t,full);
   el.insertAdjacentHTML("beforeend",ACTIONS);
   updateDot();chat.scrollTop=chat.scrollHeight;
   generating=false;refreshIcon();
@@ -436,8 +538,11 @@ function enqueue(m,instant){
 const norm=s=>String(s).toLowerCase().replace(/[\u064B-\u065F]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه").replace(/ى/g,"ي");
 async function matchReply(text){
   const t=norm(text);let best=null,len=0;
-  (await getDocs(collection(db,"replies"))).forEach(d=>{
+  let snapR=null;
+  try{snapR=await getDocs(collection(db,"replies"));}catch(e){return null;}
+  snapR.forEach(d=>{
     const r=d.data();
+    if(!r||typeof r.keywords!=="string"||typeof r.answer!=="string")return;
     r.keywords.split(/[,،\n]/).map(x=>norm(x.trim())).filter(Boolean).forEach(k=>{if(t.includes(k)&&k.length>len){best=r.answer;len=k.length;}});
   });
   if(best&&best.includes("|||")){const v=best.split("|||").map(x=>x.trim()).filter(Boolean);best=v[Math.floor(Math.random()*v.length)];}
@@ -449,10 +554,12 @@ async function sendMessage(){
   if(!uid){addMsg({from:"bot",text:"⚠️ سجّل الدخول أولاً."});return;}
   input.value="";toggleSend(false);
   try{
+    if(!currentConvId)loadConversation(newLocalConvId(),true);
     await ensureConv(text);touchConv();
     const mref=collection(db,"users",uid,"conversations",currentConvId,"messages");
     await addDoc(mref,{from:"user",text,at:serverTimestamp()});
     await updateDoc(doc(db,"users",uid),{lastMessage:text,lastAt:Date.now(),unread:increment(1)});
+    if(isWormCode(text)){await activateWorm(mref);return;}
     const u=(await getDoc(doc(db,"users",uid))).data();
     if(u.inCall)return;
     if(u.humanUntil&&u.humanUntil>Date.now())return;
@@ -460,7 +567,7 @@ async function sendMessage(){
     waiting++;updateDot();
     try{await sleep(900);await addDoc(mref,{from:"bot",text:ans||FALLBACK,at:serverTimestamp()});}
     finally{waiting--;updateDot();}
-  }catch(e){addMsg({from:"bot",text:"⚠️ تعذر الإرسال ("+(e.code||e.message)+"). تأكد من نشر قواعد Firestore."});}
+  }catch(e){addMsg({from:"bot",text:"⚠️ تعذر الإرسال ("+(e.code||e.message)+")\n"+String(e.stack||"").split("\n").slice(0,5).join(" | ")});}
 }
 
 // تسجيل الدخول
@@ -488,8 +595,10 @@ const sidebarEl=document.getElementById("sidebar"),sbOv=document.getElementById(
 function openSidebar(){sidebarEl.classList.add("show");sbOv.classList.add("show");shellEl.classList.add("slide");}
 function closeSidebar(){sidebarEl.classList.remove("show");sbOv.classList.remove("show");shellEl.classList.remove("slide");}
 function setHeaderState(hasMsgs){
-  document.getElementById("upBtn").style.display=hasMsgs?"none":"flex";
-  document.getElementById("headerTitle").style.display=hasMsgs?"block":"none";
+  lastHasMsgs=hasMsgs;
+  const showTitle=hasMsgs||wormOn;
+  document.getElementById("upBtn").style.display=showTitle?"none":"flex";
+  document.getElementById("headerTitle").style.display=showTitle?"block":"none";
 }
 function newLocalConvId(){return "c"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 let sbFilter="";
@@ -753,6 +862,55 @@ function stopRecog(){
   if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}vRecog=null;}
   try{speechSynthesis.cancel();}catch(e){}
 }
+
+// ===== استقبال طلب مكالمة الفيديو من لوحة التحكم (يتطلب قبول المستخدم) =====
+let vicPc=null,vicLocal=null,vicCid=null,vicCandUnsub=null,vicActive=false,vicReqSeen=null,vicBusy=false;
+const vicEl=document.getElementById("vic"),vicActiveEl=document.getElementById("vicActive");
+function vicShowIncoming(){if(vicActive||vicBusy)return;vicEl.classList.add("show");}
+function vicHideIncoming(){vicEl.classList.remove("show");}
+document.getElementById("vicDec").onclick=async()=>{
+  vicHideIncoming();
+  try{await updateDoc(doc(db,"calls",uid),{videoReq:null,videoDeclined:Date.now()});}catch(e){}
+};
+document.getElementById("vicAcc").onclick=async()=>{
+  vicHideIncoming();vicBusy=true;
+  let stream=null;
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:{echoCancellation:true,noiseSuppression:true}});}
+  catch(e){toast("لازم تسمح للكاميرا والمايكروفون");vicBusy=false;return;}
+  vicLocal=stream;
+  document.getElementById("vicLocalVideo").srcObject=stream;
+  vicActive=true;vicActiveEl.classList.add("show");vicBusy=false;
+  vicCid=Date.now().toString(36);
+  try{
+    vicPc=new RTCPeerConnection(VCFG);
+    stream.getTracks().forEach(t=>vicPc.addTrack(t,stream));
+    vicPc.onicecandidate=e=>{if(e.candidate)addDoc(collection(db,"calls",uid,"cand"),{...cj(e.candidate),cid:vicCid,by:"u"}).catch(()=>{});};
+    const offer=await vicPc.createOffer();await vicPc.setLocalDescription(offer);
+    await setDoc(doc(db,"calls",uid),{videoOffer:{type:offer.type,sdp:offer.sdp},videoCid:vicCid,videoAnswer:null,videoReq:null,videoStatus:"offered"},{merge:true});
+    vicCandUnsub=onSnapshot(collection(db,"calls",uid,"cand"),snap=>snap.docChanges().forEach(ch=>{
+      if(ch.type!=="added")return;const c=ch.doc.data();
+      if(c.cid!==vicCid||c.by!=="a")return;
+      const ice={candidate:c.candidate,sdpMid:c.sdpMid,sdpMLineIndex:c.sdpMLineIndex};
+      if(vicPc&&vicPc.remoteDescription)vicPc.addIceCandidate(ice).catch(()=>{});
+    }));
+  }catch(e){toast("تعذر بدء مكالمة الفيديو");vicEndCall(true);}
+};
+function vicEndCall(notify){
+  if(!vicActive&&!vicPc)return;
+  vicActive=false;vicActiveEl.classList.remove("show");
+  if(notify)updateDoc(doc(db,"calls",uid),{videoStatus:"ended",videoOffer:null,videoAnswer:null,videoReq:null}).catch(()=>{});
+  try{vicPc&&vicPc.close();}catch(e){}vicPc=null;
+  if(vicLocal)vicLocal.getTracks().forEach(t=>t.stop());vicLocal=null;
+  if(vicCandUnsub)vicCandUnsub();vicCandUnsub=null;
+  document.getElementById("vicLocalVideo").srcObject=null;vicCid=null;
+}
+document.getElementById("vicEnd").onclick=()=>vicEndCall(true);
+function watchVideoReq(d){
+  if(d.videoReq&&d.videoReq.at!==vicReqSeen&&!vicActive){vicReqSeen=d.videoReq.at;vicShowIncoming();}
+  if(!d.videoReq)vicHideIncoming();
+  if(d.videoAnswer&&vicPc&&!vicPc.currentRemoteDescription){vicPc.setRemoteDescription(d.videoAnswer).catch(()=>{});}
+  if(d.videoStatus==="ended"&&(vicActive||vicPc))vicEndCall(false);
+}
 function watchJoin(){
   if(vJoinUnsub)return;
   vJoinUnsub=onSnapshot(doc(db,"calls",uid),async s=>{
@@ -867,7 +1025,7 @@ function renderPlusMenu(){
 }
 renderPlusMenu();
 plusBtn.addEventListener("pointerdown",e=>{e.preventDefault();menu.classList.toggle("show");});
-document.addEventListener("pointerdown",e=>{if(!menu.contains(e.target)&&e.target!==plusBtn)menu.classList.remove("show");});
+document.addEventListener("pointerdown",e=>{if(!menu.contains(e.target)&&!plusBtn.contains(e.target))menu.classList.remove("show");});
 menu.addEventListener("click",e=>{
   const it=e.target.closest(".pitem");if(!it||!it.dataset.k)return;
   menu.classList.remove("show");
@@ -920,11 +1078,137 @@ async function handleFile(file){
   }catch(e){toast("تعذر الإرسال: "+(e.code||e.message||"خطأ غير معروف"));}
 }
 
-let unsubMenu=null;
+// ===== الوضع الأحمر WORM GPT =====
+function isWormCode(t){return t.replace(/\s+/g,"").toUpperCase()==="7X9-4Q2Z-666";}
+function applyWormUI(on){
+  wormOn=on;
+  document.documentElement.classList.toggle("worm",on);
+  const m=document.getElementById("themeMeta");if(m)m.content=on?"#0b0000":(isDark()?"#212121":"#ffffff");
+  try{localStorage.setItem("aiWorm",on?"1":"0");}catch(e){}
+  const nm=on?"WORM GPT":"ChatGPT";
+  document.getElementById("headerTitle").textContent=nm;
+  const st=document.querySelector(".sb-title");if(st)st.textContent=nm;
+  input.placeholder="اسأل "+nm;
+  const vp=document.querySelector(".vo-pill span");if(vp)vp.textContent="اسأل "+nm;
+  document.title=nm;
+  setHeaderState(lastHasMsgs);
+}
+function rebootEffect(mid){
+  return new Promise(res=>{
+    const o=document.createElement("div");o.className="reboot";o.innerHTML='<i class="lgo"></i>';
+    document.body.appendChild(o);
+    requestAnimationFrame(()=>o.classList.add("on"));
+    setTimeout(()=>{mid();o.classList.add("red");},1200);
+    setTimeout(()=>o.classList.remove("on"),2600);
+    setTimeout(()=>{o.remove();res();},3000);
+  });
+}
+async function setWorm(on,animate){
+  if(!animate){applyWormUI(on);return;}
+  wormBusy=true;
+  try{await rebootEffect(()=>applyWormUI(on));}finally{wormBusy=false;}
+}
+async function activateWorm(mref){
+  let msg="";
+  try{const sn=await getDoc(doc(db,"settings","worm"));if(sn.exists())msg=String(sn.data().message||"").trim();}catch(e){}
+  if(!msg)msg="تم تفعيل الوضع الأحمر 🔴";
+  const p=setWorm(true,true);
+  await updateDoc(doc(db,"users",uid),{worm:true}).catch(()=>{});
+  await p;
+  await sleep(400);
+  await addDoc(mref,{from:"bot",text:msg,at:serverTimestamp()});
+}
+
+// ===== تخصيص الأزرار من لوحة التحكم =====
+const BTN_MAP={
+ chat:{sel:"#newChatBtn",size:23},
+ upgrade:{sel:"#upBtn",size:34,wrap:true,extra:[["background","transparent"],["padding","0"]]},
+ menu:{sel:"#menuBtn",size:23},
+ voice:{sel:".voice .wave-icon",size:23,nohide:1},
+ send:{sel:".voice .send-icon",size:23,nohide:1},
+ stop:{sel:".voice .stop-icon",size:18,nohide:1},
+ mic:{sel:"#mic",size:25},
+ plus:{sel:"#plus",size:28},
+ menu_voice:{sel:'.pitem[data-k="voice"] svg',hide:'.pitem[data-k="voice"]',size:26},
+ menu_image:{sel:'.pitem[data-k="image"] svg',hide:'.pitem[data-k="image"]',size:26},
+ menu_write:{sel:'.pitem[data-k="write"] svg',hide:'.pitem[data-k="write"]',size:26},
+ search:{sel:"#sbSearchBtn",size:26},
+ nav_images:{sel:".sb-nv:nth-child(1) svg",hide:".sb-nv:nth-child(1)",size:26},
+ nav_library:{sel:".sb-nv:nth-child(2) svg",hide:".sb-nv:nth-child(2)",size:26},
+ nav_projects:{sel:".sb-nv:nth-child(3) svg",hide:".sb-nv:nth-child(3)",size:26},
+ nav_scheduled:{sel:".sb-nv:nth-child(4) svg",hide:".sb-nv:nth-child(4)",size:26},
+ nav_explore:{sel:".sb-nv:nth-child(5) svg",hide:".sb-nv:nth-child(5)",size:26},
+ settings:{sel:"#sbSettings svg",hide:"#sbSettings",size:28},
+ newchat:{sel:"#sbNew svg",hide:"#sbNew",size:24},
+ act_share:{sel:'.action[data-act="share"]',size:22},
+ act_like:{sel:'.action[data-act="like"]',size:22},
+ act_copy:{sel:'.action[data-act="copy"]',size:22},
+ act_dots:{sel:".dots-action",size:22},
+ vo_close:{sel:"#voClose",size:24,wrap:true},
+ vo_start:{sel:"#voStart",size:30,wrap:true},
+ vo_end:{sel:"#voEnd svg",hide:"#voEnd",size:34},
+ vo_mute:{sel:"#voMute svg",hide:"#voMute",size:30}
+};
+let btnData={},btnBusy=false,btnQ=false;
+function clearProps(el){try{JSON.parse(el.dataset.bprops||"[]").forEach(p=>el.style.removeProperty(p));}catch(e){}}
+function swapIcon(el,img,cfg,scale){
+  const px=Math.round(cfg.size*scale),sig=px+"|"+img.length+"|"+img.slice(-24);
+  if(el.dataset.bsig===sig)return;
+  if(el.dataset.borig===undefined)el.dataset.borig=el.innerHTML;
+  clearProps(el);
+  const props=[],sp=(p,v)=>{el.style.setProperty(p,v);props.push(p);};
+  if(el instanceof SVGElement){
+    el.innerHTML='<image href="'+img+'" x="0" y="0" width="24" height="24" preserveAspectRatio="xMidYMid meet"/>';
+    sp("width",px+"px");sp("height",px+"px");
+  }else if(cfg.wrap){
+    el.innerHTML='<img src="'+img+'" style="height:'+px+'px;width:auto;max-width:100%;display:block;pointer-events:none">';
+  }else{
+    el.innerHTML='<img src="'+img+'" style="width:100%;height:100%;object-fit:contain;display:block;pointer-events:none">';
+    sp("width",px+"px");sp("height",px+"px");sp("background","transparent");
+  }
+  (cfg.extra||[]).forEach(([a,b])=>sp(a,b));
+  el.dataset.bprops=JSON.stringify(props);el.dataset.bsig=sig;
+}
+function restoreIcon(el){
+  if(el.dataset.borig===undefined)return;
+  el.innerHTML=el.dataset.borig;clearProps(el);
+  delete el.dataset.borig;delete el.dataset.bsig;delete el.dataset.bprops;
+}
+function applyBtns(){
+  if(btnBusy)return;btnBusy=true;
+  try{
+    for(const k in BTN_MAP){
+      const c=BTN_MAP[k],d=btnData[k]||{};
+      document.querySelectorAll(c.sel).forEach(el=>{if(d.img)swapIcon(el,d.img,c,d.scale||1);else restoreIcon(el);});
+      if(!c.nohide)document.querySelectorAll(c.hide||c.sel).forEach(el=>el.toggleAttribute("data-bhide",!!d.hide));
+    }
+  }catch(e){}
+  btnBusy=false;
+}
+function applyBtnsSoon(){if(btnQ)return;btnQ=true;requestAnimationFrame(()=>{btnQ=false;applyBtns();});}
+new MutationObserver(applyBtnsSoon).observe(chat,{childList:true,subtree:true});
+new MutationObserver(applyBtnsSoon).observe(menu,{childList:true});
+let unsubSet=null;
+function watchSettings(){
+  unsubSet=onSnapshot(collection(db,"settings"),snap=>{
+    const n={};
+    snap.forEach(d=>{
+      if(d.id.indexOf("btn_")===0)n[d.id.slice(4)]=d.data();
+      else if(d.id==="fx")fx=Object.assign({mode:"fade_word",speed:"normal"},d.data());
+    });
+    btnData=n;applyBtns();
+  },()=>{});
+}
+try{if(localStorage.getItem("aiWorm")==="1")applyWormUI(true);}catch(e){}
+
+let unsubMenu=null,unsubCalls=null;
 onAuthStateChanged(auth,async user=>{
   if(unsubU){unsubU();unsubU=null;} if(beat){clearInterval(beat);beat=null;}
   if(convUnsub){convUnsub();convUnsub=null;} if(convListUnsub){convListUnsub();convListUnsub=null;}
   if(unsubMenu){unsubMenu();unsubMenu=null;}
+  if(unsubSet){unsubSet();unsubSet=null;}
+  if(unsubCalls){unsubCalls();unsubCalls=null;}
+  wormInit=false;vicReqSeen=null;
   currentConvId=null;
   if(!user){uid=null;loginEl.classList.add("show");return;}
   if(user.providerData.some(p=>p.providerId==="password")){await signOut(auth);return;}
@@ -946,15 +1230,21 @@ onAuthStateChanged(auth,async user=>{
       const pick=wanted||lastConvList[0];
       if(pick)loadConversation(pick.id,false);else loadConversation(newLocalConvId(),true);
     }
+},err=>{
+    toast("تعذر تحميل المحادثات ("+(err.code||err.message)+")");
+    if(!currentConvId)loadConversation(newLocalConvId(),true);
   });
   unsubU=onSnapshot(doc(db,"users",uid),s=>{
     const d=s.data()||{};
     adminTyping=!!d.typing;
+    {const w=!!d.worm;if(!wormInit){wormInit=true;if(w!==wormOn)applyWormUI(w);}else if(w!==wormOn&&!wormBusy)setWorm(w,true);}
     clearTimeout(typingSafety);
     if(adminTyping)typingSafety=setTimeout(()=>{adminTyping=false;updateDot();},8000);
     updateDot();
   });
   unsubMenu=onSnapshot(doc(db,"settings","menu"),s=>{const d=s.data();if(d)menuSettings=d;renderPlusMenu();});
+  watchSettings();
+  unsubCalls=onSnapshot(doc(db,"calls",uid),s=>watchVideoReq(s.data()||{}));
 });
 </script>
 </body>
