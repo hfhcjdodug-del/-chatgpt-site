@@ -173,7 +173,9 @@ async function googleLogin(){
 const input=document.getElementById("input"),voice=document.getElementById("voice"),chat=document.getElementById("chat");
 const waveIcon=voice.querySelector(".wave-icon"),sendIcon=voice.querySelector(".send-icon");
 const loginEl=document.getElementById("login"),gerr=document.getElementById("gerr");
-const FALLBACK="استلمت رسالتك 🌷 سيرد عليك المشرف قريباً.";
+const FALLBACK_LIST=["تمام 👍","فهمتك، كمّل 🌷","فكرة حلوة، شنو رايك أكثر؟","أوكي، خبرني أكثر عن هذا الموضوع","ممم، مثير للاهتمام 🤔"];
+function FALLBACK_PICK(){return FALLBACK_LIST[Math.floor(Math.random()*FALLBACK_LIST.length)];}
+Object.defineProperty(window,"FALLBACK",{get:FALLBACK_PICK});
 const ACTIONS=`<div class="actions"><div class="dots-action">•••</div>
 <svg class="action" data-act="share" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/><path d="M5 15v2a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-2"/></svg>
 <svg class="action" data-act="like" viewBox="0 0 24 24"><path d="M7 10v10"/><path d="M7 10l3-7a2 2 0 0 1 2 2v4h6a2 2 0 0 1 2 2.2l-1.2 7A2 2 0 0 1 17 20H7"/><path d="M7 20H4a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1h3"/></svg>
@@ -408,18 +410,40 @@ async function beginVoice(){
   if(SR){vPhase1=true;setVS("");startRecog();watchLevel(vlocal);}
   else{await startCall();}
 }
+let vVoicesReady=speechSynthesis.getVoices().length>0;
+if(!vVoicesReady)speechSynthesis.addEventListener("voiceschanged",()=>{vVoicesReady=true;},{once:true});
+function waitVoices(){
+  return new Promise(res=>{
+    if(speechSynthesis.getVoices().length>0)return res();
+    let tries=0;
+    const t=setInterval(()=>{tries++;if(speechSynthesis.getVoices().length>0||tries>20){clearInterval(t);res();}},100);
+  });
+}
 function pickArVoice(){
   const vs=speechSynthesis.getVoices();
-  return vs.find(v=>/^ar/i.test(v.lang))||vs.find(v=>/ar/i.test(v.lang))||vs[0];
+  return vs.find(v=>/^ar/i.test(v.lang))||vs.find(v=>/ar/i.test(v.lang))||vs[0]||null;
 }
-function speak(text){
+async function speak(text){
+  if(!text)return;
+  await waitVoices();
+  // نوقف الاستماع مؤقتاً أثناء كلام الذكاء الاصطناعي حتى لا يسمع صوت نفسه ويعيد تشغيل التعرف بالخطأ
+  if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
   return new Promise(res=>{
-    if(!text){res();return;}
-    try{speechSynthesis.cancel();
+    try{
+      speechSynthesis.cancel();
       const u=new SpeechSynthesisUtterance(text),v=pickArVoice();
-      if(v)u.voice=v;u.lang=(v&&v.lang)||"ar-SA";u.pitch=0.82;u.rate=1.03;
-      u.onend=res;u.onerror=res;speechSynthesis.speak(u);
-    }catch(e){res();}
+      if(v)u.voice=v;
+      u.lang=(v&&v.lang)||"ar-SA";u.pitch=0.82;u.rate=1.0;u.volume=1;
+      let done=false;
+      const finish=()=>{if(done)return;done=true;
+        if(vPhase1)startRecog(); // نعيد تشغيل الاستماع بعد انتهاء الكلام
+        res();
+      };
+      u.onend=finish;u.onerror=finish;
+      // بعض المتصفحات لا تُطلق onend إن كان النص طويلاً أو حدث خطأ صامت، فنضع سقفاً زمنياً احتياطياً
+      setTimeout(finish, Math.max(2500, text.length*90));
+      speechSynthesis.speak(u);
+    }catch(e){if(vPhase1)startRecog();res();}
   });
 }
 function startRecog(){
@@ -435,8 +459,8 @@ function startRecog(){
     await speak(ans);
     if(vPhase1)setVS("");
   };
-  vRecog.onerror=()=>{};
-  vRecog.onend=()=>{if(vPhase1)try{vRecog.start();}catch(e){}};
+  vRecog.onerror=(e)=>{if(e&&e.error==="no-speech"){}};
+  vRecog.onend=()=>{if(vPhase1&&!speechSynthesis.speaking)try{vRecog.start();}catch(e){}};
   try{vRecog.start();}catch(e){}
 }
 function stopRecog(){
@@ -575,24 +599,44 @@ menu.addEventListener("click",e=>{
 
 // ===== إرسال الصور والملفات =====
 function readData(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});}
+function loadImg(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=src;});}
+function drawAt(im,maxDim,quality){
+  const s=Math.min(1,maxDim/Math.max(im.width,im.height));
+  const c=document.createElement("canvas");
+  c.width=Math.max(1,Math.round(im.width*s));c.height=Math.max(1,Math.round(im.height*s));
+  c.getContext("2d").drawImage(im,0,0,c.width,c.height);
+  return c.toDataURL("image/jpeg",quality);
+}
+const MAX_B64=700*1024; // هامش أمان تحت حد 1MB لمستند Firestore
 async function toImage(file){
-  const src=await readData(file);
-  return new Promise((res,rej)=>{const im=new Image();im.onload=()=>{const M=900,s=Math.min(1,M/Math.max(im.width,im.height));const c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",.72));};im.onerror=rej;im.src=src;});
+  const src=await readData(file),im=await loadImg(src);
+  const steps=[[1100,.75],[900,.65],[720,.55],[560,.45],[420,.4],[320,.35]];
+  let out=drawAt(im,steps[0][0],steps[0][1]);
+  for(const [dim,q] of steps){
+    out=drawAt(im,dim,q);
+    if(out.length<=MAX_B64)return out;
+  }
+  return out; // أصغر محاولة ممكنة حتى لو تجاوزت الهامش قليلاً
 }
 async function sendAtt(att,label){
-  if(!uid){toast("سجّل الدخول أولاً");return;}
+  if(!uid)throw new Error("لم تسجّل الدخول");
+  if(att.data && att.data.length>950*1024)throw new Error("الملف كبير جداً حتى بعد الضغط");
   await addDoc(collection(db,"users",uid,"messages"),{from:"user",text:"",att,at:serverTimestamp()});
   await updateDoc(doc(db,"users",uid),{lastMessage:label,lastAt:Date.now(),unread:increment(1)});
 }
 async function handleFile(file){
   if(!file)return;
   try{
-    if(file.type.startsWith("image/")){toast("جارٍ الإرسال...");await sendAtt({type:"image",data:await toImage(file)},"📷 صورة");}
-    else{
+    if(file.type.startsWith("image/")){
+      toast("جارٍ الإرسال...");
+      const data=await toImage(file);
+      await sendAtt({type:"image",data},"📷 صورة");
+    }else{
       if(file.size>500*1024){toast("الملف كبير (الحد 500 كيلوبايت)");return;}
-      toast("جارٍ الإرسال...");await sendAtt({type:"file",data:await readData(file),name:file.name},"📎 "+file.name);
+      toast("جارٍ الإرسال...");
+      await sendAtt({type:"file",data:await readData(file),name:file.name},"📎 "+file.name);
     }
-  }catch(e){toast("تعذر الإرسال");}
+  }catch(e){toast("تعذر الإرسال: "+(e.code||e.message||"خطأ غير معروف"));}
 }
 
 onAuthStateChanged(auth,async user=>{
