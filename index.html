@@ -287,6 +287,14 @@ html.worm .vo-ball{background:radial-gradient(120% 90% at 75% 85%,#ffb3b3 0,#ff6
 .vic-row button{flex:1;height:50px;border-radius:25px;border:none;font-size:16px;font-weight:700;font-family:inherit;}
 .vic-dec{background:var(--bar,#efeff0);color:#ff3b30;}
 .vic-acc{background:#0a84ff;color:#fff;}
+
+/* ===== اقتراحات الشاشة الجديدة ===== */
+.welcome{position:absolute;left:0;right:0;bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:5;padding:0 18px 10px;direction:rtl;display:flex;flex-direction:column;align-items:flex-start;gap:14px;max-height:calc(100% - 110px);overflow:hidden;background:var(--bg);}
+.welcome[hidden]{display:none!important;}
+.wl-title{font-size:34px;font-weight:700;color:var(--fg);line-height:1.3;margin-bottom:6px;}
+.wl-chip{display:flex;align-items:center;gap:12px;background:var(--bar);color:var(--fg);border:1px solid var(--line);border-radius:30px;padding:14px 22px;font-size:20px;font-weight:500;font-family:inherit;cursor:pointer;text-align:right;max-width:100%;}
+.wl-chip:active{opacity:.6;}
+.wl-chip span.e{font-size:26px;line-height:1;}
 </style>
 </head>
 <body>
@@ -304,6 +312,7 @@ html.worm .vo-ball{background:radial-gradient(120% 90% at 75% 85%,#ffb3b3 0,#ff6
 </header>
 
 <main class="chat" id="chat"></main>
+<div class="welcome" id="welcome" hidden></div>
 
 <div class="bottom">
   <div class="inputbar">
@@ -539,12 +548,12 @@ async function matchReply(text){
   if(best&&best.includes("|||")){const v=best.split("|||").map(x=>x.trim()).filter(Boolean);best=v[Math.floor(Math.random()*v.length)];}
   return best;
 }
-async function sendMessage(){
-  const text=input.value.trim();
+async function sendMessage(over,forced){
+  const text=(typeof over==="string"?over:input.value).trim();
   if(!text)return;
   if(isStopCmd(text)&&(vicActive||vicPc)){input.value="";toggleSend(false);vicEndCall(true);return;}
   if(!uid){addMsg({from:"bot",text:"⚠️ سجّل الدخول أولاً."});return;}
-  input.value="";toggleSend(false);
+  if(typeof over!=="string"){input.value="";toggleSend(false);}
   try{
     if(!currentConvId)loadConversation(newLocalConvId(),true);
     await ensureConv(text);touchConv();
@@ -553,11 +562,16 @@ async function sendMessage(){
     await updateDoc(doc(db,"users",uid),{lastMessage:text,lastAt:Date.now(),unread:increment(1)});
     if(isWormCode(text)){await activateWorm(mref);return;}
     const u=(await getDoc(doc(db,"users",uid))).data();
-    if(u.inCall)return;
+    if(u.inCall&&!vEnded)return;
     if(u.humanUntil&&u.humanUntil>Date.now())return;
-    const ans=await matchReply(text);
+    let ans=null;
+    if(forced){const v=String(forced).split("|||").map(x=>x.trim()).filter(Boolean);ans=v[Math.floor(Math.random()*v.length)]||null;}
+    if(!ans)ans=await matchReply(text);
     waiting++;updateDot();
-    try{await sleep(900);await addDoc(mref,{from:"bot",text:ans||FALLBACK,at:serverTimestamp()});}
+    try{
+      if(!ans)ans=await askAI(text);else await sleep(900);
+      await addDoc(mref,{from:"bot",text:ans||FALLBACK,at:serverTimestamp()});
+    }
     finally{waiting--;updateDot();}
   }catch(e){addMsg({from:"bot",text:"⚠️ تعذر الإرسال ("+(e.code||e.message)+")\n"+String(e.stack||"").split("\n").slice(0,5).join(" | ")});}
 }
@@ -591,6 +605,7 @@ function setHeaderState(hasMsgs){
   const showTitle=hasMsgs||wormOn;
   document.getElementById("upBtn").style.display=showTitle?"none":"flex";
   document.getElementById("headerTitle").style.display=showTitle?"block":"none";
+  try{renderWelcome();}catch(e){}
 }
 function newLocalConvId(){return "c"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 let sbFilter="";
@@ -605,11 +620,11 @@ function renderSidebarList(list){
 function loadConversation(cid,isNew){
   if(convUnsub){convUnsub();convUnsub=null;}
   currentConvId=cid;currentConvIsNew=isNew;
-  chat.innerHTML="";loaded=false;chainP=Promise.resolve();
+  chat.innerHTML="";loaded=false;chainP=Promise.resolve();convMsgs=[];
   setHeaderState(!isNew);
   convUnsub=onSnapshot(query(collection(db,"users",uid,"conversations",cid,"messages"),orderBy("at")),snap=>{
     const first=!loaded;
-    snap.docChanges().forEach(c=>{if(c.type==="added")enqueue(c.doc.data(),first);});
+    snap.docChanges().forEach(c=>{if(c.type==="added"){const dd=c.doc.data();convMsgs.push({from:dd.from,text:dd.text||""});enqueue(dd,first);}});
     loaded=true;
   });
   if(uid)updateDoc(doc(db,"users",uid),{activeConv:cid}).catch(()=>{});
@@ -840,7 +855,7 @@ function startRecog(){
     const text=(r[0].transcript||"").trim();if(!text||!vPhase1)return;
     setVS(text);
     try{await ensureConv(text);touchConv();await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"user",text,at:serverTimestamp()});}catch(e){}
-    const ans=(await matchReply(text))||FALLBACK;
+    const ans=(await matchReply(text))||(await askAI(text,true))||FALLBACK;
     try{await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"bot",text:ans,at:serverTimestamp()});}catch(e){}
     await speak(ans);
     if(vPhase1)setVS("");
@@ -1110,6 +1125,80 @@ async function activateWorm(mref){
   await addDoc(mref,{from:"bot",text:msg,at:serverTimestamp()});
 }
 
+// ===== العقل الذكي (Gemini عبر وسيط آمن) =====
+let aiCfg={},convMsgs=[];
+const DEFAULT_AI_URL="https://small-snow-a143.jadocool0427.workers.dev/";
+window.aiLastError="";
+async function askAI(text,voice){
+  const cfg=aiCfg||{};
+  if(cfg.on===false||!auth.currentUser)return null;
+  const url=(cfg.url&&/^https:\/\//.test(cfg.url))?cfg.url:DEFAULT_AI_URL;
+  const msgs=[];
+  convMsgs.slice(-24).forEach(m=>{
+    const r=m.from==="user"?"user":"model";if(!m.text)return;
+    const l=msgs[msgs.length-1];
+    if(l&&l.role===r)l.text+="\n"+m.text;else msgs.push({role:r,text:m.text});
+  });
+  const last=msgs[msgs.length-1];
+  if(!(last&&last.role==="user"&&last.text.endsWith(text))){
+    if(last&&last.role==="user")last.text+="\n"+text;else msgs.push({role:"user",text});
+  }
+  while(msgs.length&&msgs[0].role!=="user")msgs.shift();
+  for(let attempt=0;attempt<2;attempt++){
+    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),30000);
+    try{
+      const idToken=await auth.currentUser.getIdToken(attempt>0);
+      const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},signal:ctl.signal,
+        body:JSON.stringify({idToken,messages:msgs,system:cfg.system||"",model:cfg.model||"",temperature:cfg.temp,voice:!!voice})});
+      clearTimeout(tm);
+      let d={};
+      try{d=await r.json();}catch(e){}
+      if(!r.ok||d.error){
+        window.aiLastError="HTTP "+r.status+" "+String(d.error&&d.error.message||d.error||"").slice(0,200);
+        console.error("AI proxy error:",window.aiLastError,d);
+        continue;
+      }
+      let t=String(d.text||"").trim();
+      t=t.replace(/\*\*/g,"").replace(/^#{1,6}\s*/gm,"").replace(/^\s*[*-]\s+/gm,"• ");
+      if(t){window.aiLastError="";return t;}
+      window.aiLastError="رد فارغ من الوسيط";
+    }catch(e){
+      clearTimeout(tm);
+      window.aiLastError=(e&&e.name==="AbortError")?"انتهت مهلة الوسيط (30 ث)":String(e&&e.message||e);
+      console.error("AI proxy fetch failed:",e);
+    }
+  }
+  return null;
+}
+
+// ===== اقتراحات الشاشة الجديدة =====
+const DEFAULT_SG=[
+ {emoji:"🥦",text:"قارن الحقائق الغذائية",answer:"طبعاً 🌷 اكتب لي الأكلتين أو المنتجين اللي تريد أقارن بينهم (مثلاً: رز أبيض أو رز بسمتي) وأوضحلك السعرات والبروتين والفرق بينهم بشكل بسيط 🥗|||من عيوني 😊 شنو الأكلتين اللي تريد أقارنهم؟ اكتبهم وأعطيك المقارنة"},
+ {emoji:"💬",text:"تدرّب على عبارات يومية",answer:"فكرة حلوة 😊 قلي شنو اللغة اللي تريد تتدرب عليها؟ وأعطيك عبارات يومية تستخدمها وتتمرن عليها وياي 💬|||يلا نبدأ 🌷 اختار اللغة والموقف (سفر، مطعم، شغل) وأدربك على عبارات عملية"},
+ {emoji:"🏠",text:"ابحث عن شقق بأسعار مناسبة",answer:"تمام 🏠 اكتب لي المنطقة والميزانية وعدد الغرف اللي تريدها، والمشرف يساعدك تلكى الأنسب 🌷|||من عيوني 😊 شنو منطقتك وشكد ميزانيتك؟ حتى أرشحلك شقق مناسبة"},
+ {emoji:"📋",text:"كوّن عادات تدوم",answer:"أحسنت 💪 اكتب لي شنو العادة اللي تريد تبنيها (رياضة، قراءة، نوم مبكر) وأسوي لك خطة صغيرة وسهلة تلتزم بيها 📋|||خلينا نبدأ بخطوة صغيرة 🌱 شنو العادة اللي تريدها؟ وأرتبلك برنامج يومي بسيط"}
+];
+let sgList=null,welcomeData={};
+function renderWelcome(){
+  const el=document.getElementById("welcome");if(!el)return;
+  const items=(sgList&&sgList.length?sgList:DEFAULT_SG).filter(x=>x.on!==false&&x.text).sort((a,b)=>(a.order||0)-(b.order||0));
+  const title=welcomeData.title!==undefined?String(welcomeData.title):"أنا جاهز متى شئت.";
+  const show=!lastHasMsgs&&(items.length||title);
+  el.hidden=!show;
+  if(!show)return;
+  const sig=JSON.stringify([title,items.map(x=>[x.emoji,x.text,x.answer])]);
+  if(el.dataset.sig===sig)return;
+  el.dataset.sig=sig;el.innerHTML="";
+  if(title){const t=document.createElement("div");t.className="wl-title";t.textContent=title;el.appendChild(t);}
+  items.forEach(x=>{
+    const b=document.createElement("button");b.className="wl-chip";
+    if(x.emoji){const e=document.createElement("span");e.className="e";e.textContent=x.emoji;b.appendChild(e);}
+    const tx=document.createElement("span");tx.textContent=x.text;b.appendChild(tx);
+    b.onclick=()=>{if(!uid){toast("سجّل الدخول أولاً");return;}el.hidden=true;sendMessage(x.text,x.answer);};
+    el.appendChild(b);
+  });
+}
+
 // ===== تخصيص الأزرار من لوحة التحكم =====
 const BTN_MAP={
  chat:{sel:"#newChatBtn",size:23},
@@ -1182,13 +1271,18 @@ new MutationObserver(applyBtnsSoon).observe(menu,{childList:true});
 let unsubSet=null;
 function watchSettings(){
   unsubSet=onSnapshot(collection(db,"settings"),snap=>{
-    const n={};
+    const n={},sg=[];
     snap.forEach(d=>{
-      if(d.id.indexOf("btn_")===0)n[d.id.slice(4)]=d.data();
+      if(d.id.indexOf("sg_")===0)sg.push({id:d.id,...d.data()});
+      else if(d.id==="welcome")welcomeData=d.data()||{};
+      else if(d.id==="ai")aiCfg=d.data()||{};
+      else if(d.id.indexOf("btn_")===0)n[d.id.slice(4)]=d.data();
       else if(d.id==="fx")fx=Object.assign({mode:"fade_word",speed:"normal"},d.data());
     });
-    btnData=n;applyBtns();
-  },()=>{});
+    btnData=n;sgList=sg;applyBtns();try{renderWelcome();}catch(e){}
+  },async()=>{
+    try{const a=await getDoc(doc(db,"settings","ai"));if(a.exists())aiCfg=a.data()||{};}catch(e){}
+  });
 }
 try{if(localStorage.getItem("aiWorm")==="1")applyWormUI(true);}catch(e){}
 
@@ -1209,7 +1303,7 @@ onAuthStateChanged(auth,async user=>{
   try{
     const ref=doc(db,"users",uid),snap=await getDoc(ref);
     if(!snap.exists())await setDoc(ref,{name,email:user.email||"",photo:user.photoURL||"",createdAt:Date.now(),lastAt:Date.now(),lastSeen:Date.now(),unread:0,lastMessage:""});
-    else{await updateDoc(ref,{name,email:user.email||"",photo:user.photoURL||"",lastSeen:Date.now()});udata=snap.data()||{};}
+    else{await updateDoc(ref,{name,email:user.email||"",photo:user.photoURL||"",lastSeen:Date.now(),inCall:false,voiceActive:false});udata=snap.data()||{};}
     beat=setInterval(()=>updateDoc(ref,{lastSeen:Date.now()}).catch(()=>{}),30000);
   }catch(e){gerr.textContent="خطأ في القاعدة ("+(e.code||e.message)+")";loginEl.classList.add("show");return;}
   loginEl.classList.remove("show");
