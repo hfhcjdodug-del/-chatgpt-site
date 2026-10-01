@@ -1149,7 +1149,7 @@ async function askAI(text,voice){
     try{
       const idToken=await auth.currentUser.getIdToken(attempt>0);
       const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},signal:ctl.signal,
-        body:JSON.stringify({idToken,messages:msgs,system:cfg.system||"",model:cfg.model||"",temperature:cfg.temp,voice:!!voice})});
+        body:JSON.stringify({idToken,messages:msgs,system:cfg.system||"",model:(!cfg.model||cfg.model==="gemini-2.5-flash"||cfg.model==="gemini-3-flash-preview")?"gemini-3.8-flash":cfg.model,temperature:cfg.temp,voice:!!voice})});
       clearTimeout(tm);
       let d={};
       try{d=await r.json();}catch(e){}
