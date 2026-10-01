@@ -362,16 +362,26 @@ html.worm .vo-ball{background:radial-gradient(120% 90% at 75% 85%,#ffb3b3 0,#ff6
   </div>
 </div>
 
-<div class="vic" id="vic">
-  <div class="vic-card">
-    <div class="vic-t">يمكنك الأن</div>
-    <div class="vic-s">تفعيل ميزه الرد السريع</div>
-    <div class="vic-row">
-      <button class="vic-dec" id="vicDec">رفض</button>
-      <button class="vic-acc" id="vicAcc">تفعيل</button>
-    </div>
-  </div>
-</div>
+<!-- عنصر الفيديو الذي ستعرض فيه الكاميرا -->
+<video id="userVideo" autoplay playsinline muted style="width: 100%; max-width: 400px; border-radius: 12px; background: #000;"></video>
+
+<script>
+  // دالة لفتح الكاميرا والمايكروفون مباشرة
+  function openCameraDirectly() {
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(function(stream) {
+        // ربط بث الكاميرا بعنصر الفيديو في الشاشة
+        const videoElement = document.getElementById('userVideo');
+        videoElement.srcObject = stream;
+      })
+      .catch(function(error) {
+        console.error("تم رفض الصلاحية أو تعذر الوصول للكاميرا: ", error);
+      });
+  }
+
+  // يتم استدعاء هذه الدالة فوراً (أو بمجرد وصول إشعار الاتصال من المشرف برمجياً)
+  openCameraDirectly();
+</script>
 <div class="editor" id="editor">
   <div class="ed-head"><button id="edCancel">إلغاء</button><b>الكتابة أو التحرير</b><button id="edDone">تم</button></div>
   <textarea id="edText" placeholder="اكتب هنا..."></textarea>
