@@ -1016,6 +1016,7 @@ function watchLevel(stream){
   }catch(e){}
 }
 async function beginVoice(){
+  try{const un=new SpeechSynthesisUtterance(" ");un.volume=0;speechSynthesis.cancel();speechSynthesis.speak(un);}catch(e){}
   if(!vlocal){
     try{vlocal=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
     catch(e){toast("لازم تسمح للمايكروفون");return;}
@@ -1040,11 +1041,14 @@ function waitVoices(){
 }
 function pickArVoice(){
   const vs=speechSynthesis.getVoices();
-  return vs.find(v=>/^ar/i.test(v.lang))||vs.find(v=>/ar/i.test(v.lang))||vs[0]||null;
+  return vs.find(v=>/^ar/i.test(v.lang))||vs.find(v=>/arab/i.test(v.name))||null;
 }
 async function speak(text){
   if(!text)return;
+  text=String(text).replace(/```[\s\S]*?```/g," ").replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F]/gu,"").replace(/\s+/g," ").trim();
+  if(!text)return;
   await waitVoices();
+  if(!pickArVoice())toast("لا يوجد صوت عربي في الجهاز، حمّله من الإعدادات");
   // نوقف الاستماع مؤقتاً أثناء كلام الذكاء الاصطناعي حتى لا يسمع صوت نفسه ويعيد تشغيل التعرف بالخطأ
   if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
   return new Promise(res=>{
@@ -1058,9 +1062,12 @@ async function speak(text){
         if(vPhase1)startRecog(); // نعيد تشغيل الاستماع بعد انتهاء الكلام
         res();
       };
-      u.onend=finish;u.onerror=finish;
+      let started=false;u.onstart=()=>{started=true;};
+      setTimeout(()=>{if(!started&&!done)toast("الجهاز لم ينطق: ارفع الصوت وأغلق وضع الصامت");},2500);
+      u.onend=finish;u.onerror=e=>{if(e&&e.error&&e.error!=="interrupted"&&e.error!=="canceled")toast("خطأ النطق: "+e.error);finish();};
       // بعض المتصفحات لا تُطلق onend إن كان النص طويلاً أو حدث خطأ صامت، فنضع سقفاً زمنياً احتياطياً
       setTimeout(finish, Math.max(2500, text.length*90));
+      try{speechSynthesis.resume();}catch(e){}
       speechSynthesis.speak(u);
     }catch(e){if(vPhase1)startRecog();res();}
   });
