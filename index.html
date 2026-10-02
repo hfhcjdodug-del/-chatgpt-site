@@ -958,8 +958,8 @@ vo.innerHTML=`
   <button class="vo-x" id="voClose">✕</button>
   <div class="vo-title">تعرّف على Voice</div>
   <div class="vo-ballwrap"><div class="vo-ball"></div></div>
-  <div class="vo-name">Sol</div><div class="vo-sub">ذكي وهادئ</div>
-  <div class="vo-dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="on"></i></div>
+  <div class="vo-name" id="voName">Sol</div><div class="vo-sub" id="voSub"></div>
+  <div class="vo-dots" id="voDots"></div>
   <button class="vo-start" id="voStart">ابدأ الوضع الصوتي</button>
 </div>
 <div class="vo-l" id="voL" style="display:none">
@@ -1016,6 +1016,7 @@ function watchLevel(stream){
   }catch(e){}
 }
 async function beginVoice(){
+  unlockAudio();
   try{const un=new SpeechSynthesisUtterance(" ");un.volume=0;speechSynthesis.cancel();speechSynthesis.speak(un);}catch(e){}
   if(!vlocal){
     try{vlocal=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
@@ -1029,6 +1030,74 @@ async function beginVoice(){
   if(!window.speechSynthesis||!speechSynthesis.getVoices)toast("هذا المتصفح لا يدعم النطق الصوتي");
   if(SR){vPhase1=true;setVS("");startRecog();watchLevel(vlocal);}
   else{await startCall();}
+}
+
+// ===== أصوات بشرية (Azure عبر الوسيط) =====
+const VOICES=[
+ {id:"ar-IQ-RanaNeural",n:"Rana",s:"لهجة عراقية • أنثى"},
+ {id:"ar-IQ-BasselNeural",n:"Bassel",s:"لهجة عراقية • ذكر"},
+ {id:"ar-SA-HamedNeural",n:"Hamed",s:"لهجة سعودية • ذكر"},
+ {id:"ar-SA-ZariyahNeural",n:"Zariyah",s:"لهجة سعودية • أنثى"},
+ {id:"ar-EG-SalmaNeural",n:"Salma",s:"لهجة مصرية • أنثى"},
+ {id:"ar-EG-ShakirNeural",n:"Shakir",s:"لهجة مصرية • ذكر"},
+ {id:"ar-AE-FatimaNeural",n:"Fatima",s:"لهجة إماراتية • أنثى"},
+ {id:"ar-AE-HamdanNeural",n:"Hamdan",s:"لهجة إماراتية • ذكر"},
+ {id:"ar-KW-NouraNeural",n:"Noura",s:"لهجة كويتية • أنثى"}
+];
+let vIdx=0;
+try{const sv=localStorage.getItem("vvoice");const k=VOICES.findIndex(x=>x.id===sv);if(k>=0)vIdx=k;}catch(e){}
+function curVoice(){return VOICES[vIdx]||VOICES[0];}
+function renderVoicePick(){
+  const v=curVoice(),n=document.getElementById("voName"),s2=document.getElementById("voSub"),d=document.getElementById("voDots");
+  if(n)n.textContent=v.n;if(s2)s2.textContent=v.s;
+  if(d)d.innerHTML=VOICES.map((_,i)=>'<i class="'+(i===vIdx?"on":"")+'" data-i="'+i+'"></i>').join("");
+}
+function setVoiceIdx(i){
+  vIdx=(i+VOICES.length)%VOICES.length;
+  try{localStorage.setItem("vvoice",curVoice().id);}catch(e){}
+  renderVoicePick();
+}
+renderVoicePick();
+(function(){
+  const el=document.getElementById("voW");if(!el)return;
+  let x0=null;
+  el.addEventListener("touchstart",e=>{x0=e.touches[0].clientX;},{passive:true});
+  el.addEventListener("touchend",e=>{
+    if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;
+    if(Math.abs(dx)>40)setVoiceIdx(vIdx+(dx<0?1:-1));
+  },{passive:true});
+  const dd=document.getElementById("voDots");
+  if(dd)dd.addEventListener("click",e=>{const i=e.target&&e.target.dataset&&e.target.dataset.i;if(i!=null)setVoiceIdx(+i);});
+})();
+const vAudio=new Audio();vAudio.preload="auto";
+window.vCloudOK=true;
+function unlockAudio(){
+  try{vAudio.src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";const p=vAudio.play();if(p&&p.catch)p.catch(()=>{});}catch(e){}
+}
+async function speakCloud(text){
+  if(window.vCloudOK===false)return false;
+  text=String(text||"").replace(/```[\s\S]*?```/g," ").replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F]/gu,"").replace(/\s+/g," ").trim().slice(0,500);
+  if(!text||!auth.currentUser)return false;
+  const cfg=aiCfg||{};
+  const url=(cfg.url&&/^https:\/\//.test(cfg.url))?cfg.url:DEFAULT_AI_URL;
+  try{
+    const idToken=await auth.currentUser.getIdToken();
+    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),15000);
+    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},signal:ctl.signal,body:JSON.stringify({idToken,tts:true,text,voice:curVoice().id})});
+    clearTimeout(tm);
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.audio){if(r.status===501)window.vCloudOK=false;console.error("TTS failed",r.status,d);return false;}
+    if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
+    let ok=true;
+    await new Promise(res=>{
+      vAudio.onended=res;vAudio.onerror=()=>{ok=false;res();};
+      vAudio.src="data:"+(d.mime||"audio/mpeg")+";base64,"+d.audio;
+      const p=vAudio.play();if(p&&p.catch)p.catch(()=>{ok=false;res();});
+      setTimeout(res,Math.max(5000,text.length*200));
+    });
+    if(ok&&vPhase1)startRecog();
+    return ok;
+  }catch(e){console.error("TTS error",e);return false;}
 }
 let vVoicesReady=speechSynthesis.getVoices().length>0;
 if(!vVoicesReady)speechSynthesis.addEventListener("voiceschanged",()=>{vVoicesReady=true;},{once:true});
@@ -1044,6 +1113,10 @@ function pickArVoice(){
   return vs.find(v=>/^ar/i.test(v.lang))||vs.find(v=>/arab/i.test(v.name))||null;
 }
 async function speak(text){
+  if(await speakCloud(text))return;
+  return speakDevice(text);
+}
+async function speakDevice(text){
   if(!text)return;
   text=String(text).replace(/```[\s\S]*?```/g," ").replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F]/gu,"").replace(/\s+/g," ").trim();
   if(!text)return;
@@ -1091,6 +1164,7 @@ function startRecog(){
 }
 function stopRecog(){
   vPhase1=false;
+  try{vAudio.pause();}catch(e){}
   if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}vRecog=null;}
   try{speechSynthesis.cancel();}catch(e){}
 }
