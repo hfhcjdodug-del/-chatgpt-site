@@ -1086,7 +1086,10 @@ async function speakCloud(text){
     const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},signal:ctl.signal,body:JSON.stringify({idToken,tts:true,text,voice:curVoice().id})});
     clearTimeout(tm);
     const d=await r.json().catch(()=>({}));
-    if(!r.ok||!d.audio){if(r.status===501)window.vCloudOK=false;console.error("TTS failed",r.status,d);return false;}
+    if(!r.ok||!d.audio){
+      if(r.status===501){window.vCloudOK=false;toast("الصوت البشري غير مفعّل: مفاتيح Azure غير موجودة في Cloudflare");}
+      else toast("فشل الصوت البشري ("+r.status+"): "+String(d.detail||d.error||"").slice(0,80));
+      console.error("TTS failed",r.status,d);return false;}
     if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
     let ok=true;
     await new Promise(res=>{
