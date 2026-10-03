@@ -1,4 +1,4 @@
-(<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -769,7 +769,7 @@ async function sendMessage(over,forced){
     if(!ans)ans=await matchReply(text);
     waiting++;updateDot();
     try{
-      if(!ans)ans=await askAI(text);else await sleep(900);
+      if(!ans){ans=await askAI(text);if(!ans&&window.aiLastError)toast("الوسيط: "+window.aiLastError);}else await sleep(900);
       await addDoc(mref,{from:"bot",text:ans||FALLBACK,at:serverTimestamp()});
     }
     finally{waiting--;updateDot();}
@@ -982,6 +982,7 @@ const vAud=document.createElement("audio");vAud.autoplay=true;vAud.setAttribute(
 const $v=id=>document.getElementById(id);
 let vpc=null,vlocal=null,vcid=null,vUnsubCall=null,vUnsubCand=null,vLvl=null,vMuted=false,vPending=[],vEnded=true;
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const IS_ANDROID=/Android/i.test(navigator.userAgent);
 let vRecog=null,vPhase1=false,vJoinUnsub=null;
 const cj=c=>JSON.parse(JSON.stringify(c.toJSON()));
 function setVS(t){$v("voS").textContent=t;}
@@ -1030,7 +1031,7 @@ async function beginVoice(){
   watchJoin();
   if(!SR)toast("هذا المتصفح لا يدعم التعرف على الصوت، سيتم الاتصال بالمشرف");
   if(!window.speechSynthesis||!speechSynthesis.getVoices)toast("هذا المتصفح لا يدعم النطق الصوتي");
-  if(SR){vPhase1=true;setVS("");startRecog();watchLevel(vlocal);}
+  if(SR){vPhase1=true;setVS("");if(IS_ANDROID&&vlocal){vlocal.getTracks().forEach(t=>t.stop());vlocal=null;}startRecog();if(vlocal)watchLevel(vlocal);}
   else{await startCall();}
 }
 
@@ -1129,7 +1130,7 @@ async function speakCloud(text){
     });
   }
   if(!ok)toast("فشل الصوت البشري: "+why);
-  if(ok&&vPhase1)startRecog();
+  if(ok&&vPhase1)setTimeout(()=>{if(vPhase1)startRecog();},350);
   return ok;
 }
 let vVoicesReady=speechSynthesis.getVoices().length>0;
@@ -1182,17 +1183,18 @@ function startRecog(){
   if(!SR||!vPhase1)return;
   vRecog=new SR();vRecog.lang="ar-SA";vRecog.continuous=true;vRecog.interimResults=true;
   vRecog.onresult=async e=>{
-    const r=e.results[e.results.length-1];if(!r.isFinal)return;
+    const r=e.results[e.results.length-1];if(!r.isFinal){try{setVS((r[0].transcript||"").trim());}catch(_){}return;}
     const text=(r[0].transcript||"").trim();if(!text||!vPhase1)return;
     setVS(text);
     try{await ensureConv(text);touchConv();await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"user",text,at:serverTimestamp()});}catch(e){}
-    const ans=(await matchReply(text))||(await askAI(text,true))||FALLBACK;
+    let ans=await matchReply(text);if(!ans){ans=await askAI(text,true);if(!ans&&window.aiLastError)toast("الوسيط: "+window.aiLastError);}ans=ans||FALLBACK;
     try{await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"bot",text:ans,at:serverTimestamp()});}catch(e){}
     await speak(ans);
     if(vPhase1)setVS("");
   };
   vRecog.onerror=(e)=>{if(e&&e.error&&e.error!=="no-speech"&&e.error!=="aborted")toast("خطأ الميكروفون: "+e.error);};
-  vRecog.onend=()=>{if(vPhase1&&!speechSynthesis.speaking)try{vRecog.start();}catch(e){}};
+  const rc=vRecog;
+  vRecog.onend=()=>{setTimeout(()=>{if(vPhase1&&vRecog===rc&&!speechSynthesis.speaking)try{rc.start();}catch(e){}},250);};
   try{vRecog.start();}catch(e){}
 }
 function stopRecog(){
@@ -1250,6 +1252,13 @@ function watchVideoReq(d){
   if(d.videoAnswer&&vicPc&&!vicPc.currentRemoteDescription){vicPc.setRemoteDescription(d.videoAnswer).catch(()=>{});}
   if(d.videoStatus==="ended"&&(vicActive||vicPc))vicEndCall(false);
 }
+async function callMic(){
+  try{
+    const n=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+    if(vlocal)vlocal.getTracks().forEach(t=>t.stop());
+    vlocal=n;return true;
+  }catch(e){return !!vlocal;}
+}
 function watchJoin(){
   if(vJoinUnsub)return;
   vJoinUnsub=onSnapshot(doc(db,"calls",uid),async s=>{
@@ -1257,6 +1266,7 @@ function watchJoin(){
     if(!d||!d.adminOffer||vpc||vEnded)return;
     stopRecog();setVS("جارٍ التوصيل...");
     const jcid=d.joinCid;
+    if(!(await callMic()))return;
     vpc=new RTCPeerConnection(VCFG);
     vlocal.getTracks().forEach(t=>vpc.addTrack(t,vlocal));
     vpc.ontrack=e=>{vAud.srcObject=e.streams[0];vAud.play().catch(()=>{});watchLevel(e.streams[0]);};
@@ -1280,10 +1290,7 @@ function watchJoin(){
   });
 }
 async function startCall(){
-  if(!vlocal){
-    try{vlocal=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
-    catch(e){toast("لازم تسمح للمايكروفون");return;}
-  }
+  if(!(await callMic())){toast("لازم تسمح للمايكروفون");return;}
   $v("voW").style.display="none";$v("voL").style.display="flex";
   setVS("جارٍ الاتصال...");vMuted=false;$v("voMute").classList.remove("red");
   vcid=Date.now().toString(36);vPending=[];vEnded=false;
@@ -1548,7 +1555,8 @@ const DEFAULT_AI_URL="https://small-snow-a143.jadocool0427.workers.dev/";
 window.aiLastError="";
 async function askAI(text,voice,images){
   const cfg=aiCfg||{};
-  if(cfg.on===false||!auth.currentUser)return null;
+  if(cfg.on===false){window.aiLastError="العقل الذكي مطفأ من لوحة التحكم";return null;}
+  if(!auth.currentUser){window.aiLastError="المستخدم غير مسجّل";return null;}
   const url=(cfg.url&&/^https:\/\//.test(cfg.url))?cfg.url:DEFAULT_AI_URL;
   const msgs=[];
   convMsgs.slice(-24).forEach(m=>{
