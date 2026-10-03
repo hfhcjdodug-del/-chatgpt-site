@@ -997,6 +997,11 @@ $v("voMute").onclick=()=>{
   vMuted=!vMuted;
   if(vlocal)vlocal.getAudioTracks().forEach(t=>t.enabled=!vMuted);
   $v("voMute").classList.toggle("red",vMuted);
+  if(vMuted){
+    resetTurn();
+    if(vRecog){try{vRecog.onend=null;vRecog.abort?vRecog.abort():vRecog.stop();}catch(e){}vRecog=null;}
+    try{setVS("");}catch(e){}
+  }else if(vPhase1&&!vSpeaking&&!vRecog){startRecog();}
 };
 function watchLevel(stream){
   try{
@@ -1100,7 +1105,7 @@ async function speakCloud(text){
     }
   }
   if(!d){toast("فشل الصوت البشري: "+why);return false;}
-  if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
+  pauseRecog();
   let ok=true,played=false;
   try{
     const ac=getAC();
@@ -1130,7 +1135,7 @@ async function speakCloud(text){
     });
   }
   if(!ok)toast("فشل الصوت البشري: "+why);
-  if(ok&&vPhase1)setTimeout(()=>{if(vPhase1)startRecog();},350);
+  if(ok)resumeRecog();
   return ok;
 }
 let vVoicesReady=speechSynthesis.getVoices().length>0;
@@ -1147,8 +1152,10 @@ function pickArVoice(){
   return vs.find(v=>/^ar/i.test(v.lang))||vs.find(v=>/arab/i.test(v.name))||null;
 }
 async function speak(text){
-  if(await speakCloud(text))return;
-  return speakDevice(text);
+  try{
+    if(await speakCloud(text))return;
+    return await speakDevice(text);
+  }finally{if(vSpeaking)resumeRecog();}
 }
 async function speakDevice(text){
   if(!text)return;
@@ -1157,7 +1164,7 @@ async function speakDevice(text){
   await waitVoices();
   if(!pickArVoice())toast("لا يوجد صوت عربي في الجهاز، حمّله من الإعدادات");
   // نوقف الاستماع مؤقتاً أثناء كلام الذكاء الاصطناعي حتى لا يسمع صوت نفسه ويعيد تشغيل التعرف بالخطأ
-  if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
+  pauseRecog();
   return new Promise(res=>{
     try{
       speechSynthesis.cancel();
@@ -1166,7 +1173,7 @@ async function speakDevice(text){
       u.lang=(v&&v.lang)||"ar-SA";u.pitch=0.82;u.rate=1.0;u.volume=1;
       let done=false;
       const finish=()=>{if(done)return;done=true;
-        if(vPhase1)startRecog(); // نعيد تشغيل الاستماع بعد انتهاء الكلام
+        resumeRecog(); // نعيد تشغيل الاستماع بعد انتهاء الكلام
         res();
       };
       let started=false;u.onstart=()=>{started=true;};
@@ -1176,29 +1183,69 @@ async function speakDevice(text){
       setTimeout(finish, Math.max(2500, text.length*90));
       try{speechSynthesis.resume();}catch(e){}
       speechSynthesis.speak(u);
-    }catch(e){if(vPhase1)startRecog();res();}
+    }catch(e){resumeRecog();res();}
   });
 }
+let vSpeaking=false,vIgnoreUntil=0;
+function pauseRecog(){
+  vSpeaking=true;
+  if(IS_ANDROID)return; // على الأندرويد نبقي الاستماع شغالاً ونتجاهل النتائج لتجنب صوت التنبيه
+  if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
+}
+function resumeRecog(){
+  vIgnoreUntil=Date.now()+700;vSpeaking=false;
+  if(IS_ANDROID){if(vPhase1&&!vMuted&&!vRecog)startRecog();return;}
+  if(vPhase1&&!vMuted)setTimeout(()=>{if(vPhase1&&!vMuted)startRecog();},350);
+}
+const VOICE_SILENCE_MS=3000; // مدة الصمت (بالمللي ثانية) قبل إغلاق الميكروفون والرد
+let vBusy=false,vSilTimer=null,vPrev="",vSessText="";
+function resetTurn(){clearTimeout(vSilTimer);vSilTimer=null;vPrev="";vSessText="";}
+async function handleVoiceTurn(text){
+  setVS(text);
+  try{await ensureConv(text);touchConv();await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"user",text,at:serverTimestamp()});}catch(e){}
+  let ans=await matchReply(text);if(!ans){ans=await askAI(text,true);if(!ans&&window.aiLastError)toast("الوسيط: "+window.aiLastError);}ans=ans||FALLBACK;
+  try{await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"bot",text:ans,at:serverTimestamp()});}catch(e){}
+  await speak(ans);
+  if(vPhase1)setVS("");
+}
+async function flushTurn(){
+  vSilTimer=null;
+  const text=(vPrev+" "+vSessText).replace(/\s+/g," ").trim();
+  vPrev="";vSessText="";
+  if(!text||!vPhase1||vMuted||vSpeaking||vBusy)return;
+  vBusy=true;
+  // إغلاق الميكروفون من داخل التطبيق
+  if(vRecog){try{vRecog.onend=null;vRecog.abort?vRecog.abort():vRecog.stop();}catch(e){}vRecog=null;}
+  try{await handleVoiceTurn(text);}
+  catch(e){console.error("voice turn failed",e);}
+  finally{
+    vBusy=false;
+    if(vPhase1&&!vMuted&&!vSpeaking)setTimeout(()=>{if(vPhase1&&!vMuted&&!vRecog&&!vBusy&&!vSpeaking)startRecog();},300);
+  }
+}
 function startRecog(){
-  if(!SR||!vPhase1)return;
+  if(!SR||!vPhase1||vMuted)return;
   vRecog=new SR();vRecog.lang="ar-SA";vRecog.continuous=true;vRecog.interimResults=true;
-  vRecog.onresult=async e=>{
-    const r=e.results[e.results.length-1];if(!r.isFinal){try{setVS((r[0].transcript||"").trim());}catch(_){}return;}
-    const text=(r[0].transcript||"").trim();if(!text||!vPhase1)return;
-    setVS(text);
-    try{await ensureConv(text);touchConv();await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"user",text,at:serverTimestamp()});}catch(e){}
-    let ans=await matchReply(text);if(!ans){ans=await askAI(text,true);if(!ans&&window.aiLastError)toast("الوسيط: "+window.aiLastError);}ans=ans||FALLBACK;
-    try{await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"bot",text:ans,at:serverTimestamp()});}catch(e){}
-    await speak(ans);
-    if(vPhase1)setVS("");
+  const rc=vRecog;
+  vRecog.onresult=e=>{
+    if(vMuted||vSpeaking||vBusy||Date.now()<vIgnoreUntil)return;
+    let t="";
+    for(let i=0;i<e.results.length;i++)t+=(e.results[i][0].transcript||"")+" ";
+    vSessText=t.replace(/\s+/g," ").trim();
+    const all=(vPrev+" "+vSessText).trim();
+    if(!all)return;
+    try{setVS(all);}catch(_){}
+    clearTimeout(vSilTimer);vSilTimer=setTimeout(flushTurn,VOICE_SILENCE_MS);
   };
   vRecog.onerror=(e)=>{if(e&&e.error&&e.error!=="no-speech"&&e.error!=="aborted")toast("خطأ الميكروفون: "+e.error);};
-  const rc=vRecog;
-  vRecog.onend=()=>{setTimeout(()=>{if(vPhase1&&vRecog===rc&&!speechSynthesis.speaking)try{rc.start();}catch(e){}},250);};
+  vRecog.onend=()=>{
+    vPrev=(vPrev+" "+vSessText).trim();vSessText="";
+    setTimeout(()=>{if(vPhase1&&!vMuted&&!vBusy&&vRecog===rc&&!speechSynthesis.speaking)try{rc.start();}catch(e){}},250);
+  };
   try{vRecog.start();}catch(e){}
 }
 function stopRecog(){
-  vPhase1=false;
+  vPhase1=false;resetTurn();vBusy=false;
   try{vAudio.pause();}catch(e){}
   try{if(vSrc)vSrc.stop();}catch(e){}
   if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}vRecog=null;}
