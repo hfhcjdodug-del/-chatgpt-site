@@ -1087,7 +1087,8 @@ async function speakCloud(text){
     clearTimeout(tm);
     const d=await r.json().catch(()=>({}));
     if(!r.ok||!d.audio){
-      if(r.status===501){window.vCloudOK=false;toast("الصوت البشري غير مفعّل: مفاتيح Azure غير موجودة في Cloudflare");}
+      if(r.status===501){window.vCloudOK=false;toast("الصوت البشري غير مفعّل: مفاتيح الصوت غير موجودة في Cloudflare");}
+      else if(r.status===429&&d.error==="tts quota"){window.vCloudOK=false;toast("انتهت حصة الصوت البشري اليومية، سيُستخدم صوت الجهاز");}
       else toast("فشل الصوت البشري ("+r.status+"): "+String(d.detail||d.error||"").slice(0,80));
       console.error("TTS failed",r.status,d);return false;}
     if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
