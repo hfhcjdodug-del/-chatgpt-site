@@ -1076,28 +1076,37 @@ async function speakCloud(text){
   if(!text||!auth.currentUser)return false;
   const cfg=aiCfg||{};
   const url=(cfg.url&&/^https:\/\//.test(cfg.url))?cfg.url:DEFAULT_AI_URL;
-  try{
-    const idToken=await auth.currentUser.getIdToken();
-    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),15000);
-    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},signal:ctl.signal,body:JSON.stringify({idToken,tts:true,text,voice:curVoice().id})});
-    clearTimeout(tm);
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok||!d.audio){
-      if(r.status===501){window.vCloudOK=false;toast("الصوت البشري غير مفعّل: مفاتيح الصوت غير موجودة في Cloudflare");}
-      else if(r.status===429&&d.error==="tts quota"){window.vCloudOK=false;toast("انتهت حصة الصوت البشري اليومية، سيُستخدم صوت الجهاز");}
-      else toast("فشل الصوت البشري ("+r.status+"): "+String(d.detail||d.error||"").slice(0,80));
-      console.error("TTS failed",r.status,d);return false;}
-    if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
-    let ok=true;
-    await new Promise(res=>{
-      vAudio.onended=res;vAudio.onerror=()=>{ok=false;res();};
-      vAudio.src="data:"+(d.mime||"audio/mpeg")+";base64,"+d.audio;
-      const p=vAudio.play();if(p&&p.catch)p.catch(()=>{ok=false;res();});
-      setTimeout(res,Math.max(5000,text.length*200));
-    });
-    if(ok&&vPhase1)startRecog();
-    return ok;
-  }catch(e){console.error("TTS error",e);return false;}
+  let d=null,why="";
+  for(let attempt=0;attempt<2&&!d;attempt++){
+    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),30000);
+    try{
+      const idToken=await auth.currentUser.getIdToken(attempt>0);
+      const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},signal:ctl.signal,body:JSON.stringify({idToken,tts:true,text,voice:curVoice().id})});
+      clearTimeout(tm);
+      const j=await r.json().catch(()=>({}));
+      if(r.ok&&j.audio){d=j;break;}
+      if(r.status===501){window.vCloudOK=false;toast("الصوت البشري غير مفعّل: مفاتيح الصوت غير موجودة في Cloudflare");return false;}
+      if(r.status===429&&j.error==="tts quota"){window.vCloudOK=false;toast("انتهت حصة الصوت البشري اليومية، سيُستخدم صوت الجهاز");return false;}
+      why="HTTP "+r.status+" "+String(j.detail||j.error||"").slice(0,80);
+      console.error("TTS failed",r.status,j);
+    }catch(e){
+      clearTimeout(tm);
+      why=(e&&e.name==="AbortError")?"انتهت مهلة الصوت (30 ث)":String((e&&e.message)||e);
+      console.error("TTS error",e);
+    }
+  }
+  if(!d){toast("فشل الصوت البشري: "+why);return false;}
+  if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
+  let ok=true;
+  await new Promise(res=>{
+    vAudio.onended=res;vAudio.onerror=()=>{ok=false;why="تعذر تشغيل الملف الصوتي";res();};
+    vAudio.src="data:"+(d.mime||"audio/mpeg")+";base64,"+d.audio;
+    const p=vAudio.play();if(p&&p.catch)p.catch(e=>{ok=false;why="منع التشغيل: "+(e&&e.name||e);res();});
+    setTimeout(res,Math.max(8000,text.length*250));
+  });
+  if(!ok)toast("فشل الصوت البشري: "+why);
+  if(ok&&vPhase1)startRecog();
+  return ok;
 }
 let vVoicesReady=speechSynthesis.getVoices().length>0;
 if(!vVoicesReady)speechSynthesis.addEventListener("voiceschanged",()=>{vVoicesReady=true;},{once:true});
