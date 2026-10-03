@@ -663,7 +663,7 @@ const FXK={slow:1.8,normal:1,fast:.55};
 async function waitSkip(ms){const end=Date.now()+ms;while(Date.now()<end&&!skip)await sleep(Math.max(10,Math.min(60,end-Date.now())));}
 function plainInto(p,text){String(text).split("\n").forEach((line,i)=>{if(i)p.appendChild(document.createElement("br"));p.appendChild(document.createTextNode(line));});}
 async function revealText(t,full){
-  const mode=fx.mode||"fade_word",k=FXK[fx.speed]||1;
+  const mode=fx.mode||"fade_word",k=(FXK[fx.speed]||1)*.4;
   if(!full)return;
   if(mode==="instant"){plainInto(t,full);return;}
   if(mode==="typewriter"){
@@ -706,7 +706,7 @@ async function revealText(t,full){
 }
 async function playAssistant(m){
   waiting++;updateDot();
-  await sleep(m.from==="admin"?600:300);
+  if(m.from==="admin")await sleep(600);
   waiting--;updateDot();
   generating=true;skip=false;refreshIcon();
   const el=document.createElement("div");el.className="assistant";
@@ -728,11 +728,20 @@ function enqueue(m,instant){
   chainP=chainP.then(()=>(instant||m.from==="user")?addMsg(m):playAssistant(m)).catch(()=>{});
 }
 const norm=s=>String(s).toLowerCase().replace(/[\u064B-\u065F]/g,"").replace(/[أإآ]/g,"ا").replace(/ة/g,"ه").replace(/ى/g,"ي");
+let repCache=null,repWait=null;
+function loadReplies(){
+  if(repWait)return repWait;
+  repWait=new Promise(res=>{
+    let first=true;const done=()=>{if(first){first=false;res();}};
+    try{onSnapshot(collection(db,"replies"),sn=>{repCache=sn;done();},()=>{repWait=null;done();});}catch(e){repWait=null;done();}
+  });
+  return repWait;
+}
 async function matchReply(text){
   const t=norm(text);let best=null,len=0;
-  let snapR=null;
-  try{snapR=await getDocs(collection(db,"replies"));}catch(e){return null;}
-  snapR.forEach(d=>{
+  if(!repCache)await Promise.race([loadReplies(),sleep(1500)]);
+  if(!repCache)return null;
+  repCache.forEach(d=>{
     const r=d.data();
     if(!r||typeof r.keywords!=="string"||typeof r.answer!=="string")return;
     r.keywords.split(/[,،\n]/).map(x=>norm(x.trim())).filter(Boolean).forEach(k=>{if(t.includes(k)&&k.length>len){best=r.answer;len=k.length;}});
@@ -758,18 +767,20 @@ async function sendMessage(over,forced){
     if(!currentConvId)loadConversation(newLocalConvId(),true);
     await ensureConv(text);touchConv();
     const mref=collection(db,"users",uid,"conversations",currentConvId,"messages");
-    await addDoc(mref,{from:"user",text,at:serverTimestamp()});
-    await updateDoc(doc(db,"users",uid),{lastMessage:text,lastAt:Date.now(),unread:increment(1)});
-    if(isWormCode(text)){await activateWorm(mref);return;}
-    const u=(await getDoc(doc(db,"users",uid))).data();
-    if(u.inCall&&!vEnded)return;
-    if(u.humanUntil&&u.humanUntil>Date.now())return;
+    const addP=addDoc(mref,{from:"user",text,at:serverTimestamp()});
+    updateDoc(doc(db,"users",uid),{lastMessage:text,lastAt:Date.now(),unread:increment(1)}).catch(()=>{});
+    if(isWormCode(text)){await addP;await activateWorm(mref);return;}
+    const uP=getDoc(doc(db,"users",uid));
     let ans=null;
     if(forced){const v=String(forced).split("|||").map(x=>x.trim()).filter(Boolean);ans=v[Math.floor(Math.random()*v.length)]||null;}
     if(!ans)ans=await matchReply(text);
     waiting++;updateDot();
     try{
-      if(!ans){ans=await askAI(text);if(!ans&&window.aiLastError)toast("الوسيط: "+window.aiLastError);}else await sleep(900);
+      const aiP=ans?null:askAI(text);
+      await addP;
+      const u=(await uP).data();
+      if((u.inCall&&!vEnded)||(u.humanUntil&&u.humanUntil>Date.now())){if(aiP)aiP.catch(()=>{});return;}
+      if(aiP){ans=await aiP;if(!ans&&window.aiLastError)toast("الوسيط: "+window.aiLastError);}else await sleep(150);
       await addDoc(mref,{from:"bot",text:ans||FALLBACK,at:serverTimestamp()});
     }
     finally{waiting--;updateDot();}
@@ -982,7 +993,6 @@ const vAud=document.createElement("audio");vAud.autoplay=true;vAud.setAttribute(
 const $v=id=>document.getElementById(id);
 let vpc=null,vlocal=null,vcid=null,vUnsubCall=null,vUnsubCand=null,vLvl=null,vMuted=false,vPending=[],vEnded=true;
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-const IS_ANDROID=/Android/i.test(navigator.userAgent);
 let vRecog=null,vPhase1=false,vJoinUnsub=null;
 const cj=c=>JSON.parse(JSON.stringify(c.toJSON()));
 function setVS(t){$v("voS").textContent=t;}
@@ -997,11 +1007,6 @@ $v("voMute").onclick=()=>{
   vMuted=!vMuted;
   if(vlocal)vlocal.getAudioTracks().forEach(t=>t.enabled=!vMuted);
   $v("voMute").classList.toggle("red",vMuted);
-  if(vMuted){
-    resetTurn();
-    if(vRecog){try{vRecog.onend=null;vRecog.abort?vRecog.abort():vRecog.stop();}catch(e){}vRecog=null;}
-    try{setVS("");}catch(e){}
-  }else if(vPhase1&&!vSpeaking&&!vRecog){startRecog();}
 };
 function watchLevel(stream){
   try{
@@ -1036,7 +1041,7 @@ async function beginVoice(){
   watchJoin();
   if(!SR)toast("هذا المتصفح لا يدعم التعرف على الصوت، سيتم الاتصال بالمشرف");
   if(!window.speechSynthesis||!speechSynthesis.getVoices)toast("هذا المتصفح لا يدعم النطق الصوتي");
-  if(SR){vPhase1=true;setVS("");if(IS_ANDROID&&vlocal){vlocal.getTracks().forEach(t=>t.stop());vlocal=null;}startRecog();if(vlocal)watchLevel(vlocal);}
+  if(SR){vPhase1=true;setVS("");startRecog();watchLevel(vlocal);}
   else{await startCall();}
 }
 
@@ -1079,41 +1084,60 @@ function unlockAudio(){
   try{const ac=getAC();if(ac){if(ac.state==="suspended")ac.resume();const b=ac.createBuffer(1,1,22050),sr=ac.createBufferSource();sr.buffer=b;sr.connect(ac.destination);sr.start(0);}}catch(e){}
   try{vAudio.src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";const p=vAudio.play();if(p&&p.catch)p.catch(()=>{});}catch(e){}
 }
-async function speakCloud(text){
-  if(window.vCloudOK===false)return false;
-  text=String(text||"").replace(/```[\s\S]*?```/g," ").replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F]/gu,"").replace(/\s+/g," ").trim().slice(0,500);
-  if(!text||!auth.currentUser)return false;
+const ttsCache=new Map();
+function ttsSplit(t){
+  const ss=(t.match(/[^.!?؟]+[.!?؟]*\s*/g)||[t]).map(x=>x.trim()).filter(Boolean);
+  if(!ss.length)return [];
+  let first=ss.shift();
+  if(first.length>150){const k=first.lastIndexOf(" ",140);if(k>40){ss.unshift(first.slice(k+1));first=first.slice(0,k);}}
+  const out=[first];let cur="";
+  for(const x of ss){
+    cur=cur?cur+" "+x:x;
+    if(cur.length>200&&out.length<3){out.push(cur);cur="";}
+  }
+  if(cur){if(out.length<3)out.push(cur);else out[out.length-1]+=" "+cur;}
+  return out;
+}
+async function ttsFetch(text){
+  const key=curVoice().id+"|"+text;
+  if(ttsCache.has(key))return ttsCache.get(key);
   const cfg=aiCfg||{};
   const url=(cfg.url&&/^https:\/\//.test(cfg.url))?cfg.url:DEFAULT_AI_URL;
-  let d=null,why="";
-  for(let attempt=0;attempt<2&&!d;attempt++){
-    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),30000);
+  let why="";
+  for(let attempt=0;attempt<2;attempt++){
+    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),15000);
     try{
       const idToken=await auth.currentUser.getIdToken(attempt>0);
       const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},signal:ctl.signal,body:JSON.stringify({idToken,tts:true,text,voice:curVoice().id})});
       clearTimeout(tm);
       const j=await r.json().catch(()=>({}));
-      if(r.ok&&j.audio){d=j;break;}
-      if(r.status===501){window.vCloudOK=false;toast("الصوت البشري غير مفعّل: مفاتيح الصوت غير موجودة في Cloudflare");return false;}
-      if(r.status===429&&j.error==="tts quota"){window.vCloudOK=false;toast("انتهت حصة الصوت البشري اليومية، سيُستخدم صوت الجهاز");return false;}
+      if(r.ok&&j.audio){if(ttsCache.size>40)ttsCache.delete(ttsCache.keys().next().value);ttsCache.set(key,j);return j;}
+      if(r.status===501){window.vCloudOK=false;return {fatal:"الصوت البشري غير مفعّل: مفاتيح الصوت غير موجودة في Cloudflare"};}
+      if(r.status===429&&j.error==="tts quota"){window.vCloudOK=false;return {fatal:"انتهت حصة الصوت البشري اليومية، سيُستخدم صوت الجهاز"};}
       why="HTTP "+r.status+" "+String(j.detail||j.error||"").slice(0,80);
       console.error("TTS failed",r.status,j);
     }catch(e){
       clearTimeout(tm);
-      why=(e&&e.name==="AbortError")?"انتهت مهلة الصوت (30 ث)":String((e&&e.message)||e);
+      why=(e&&e.name==="AbortError")?"انتهت مهلة الصوت (15 ث)":String((e&&e.message)||e);
       console.error("TTS error",e);
     }
   }
-  if(!d){toast("فشل الصوت البشري: "+why);return false;}
-  pauseRecog();
-  let ok=true,played=false;
+  return {fail:why};
+}
+function ttsDecode(d){
+  const ac=getAC();
+  if(!ac||!d||!d.audio)return Promise.resolve(null);
   try{
-    const ac=getAC();
-    if(ac){
+    const bin=atob(d.audio);const u8=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+    return new Promise(res=>{const p=ac.decodeAudioData(u8.buffer,res,()=>res(null));if(p&&p.catch)p.catch(()=>res(null));});
+  }catch(e){return Promise.resolve(null);}
+}
+async function ttsPlay(d,buf){
+  const ac=getAC();
+  if(ac&&buf){
+    try{
       if(ac.state==="suspended")await ac.resume();
-      const bin=atob(d.audio);const u8=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
-      const buf=await new Promise((res,rej)=>{const p=ac.decodeAudioData(u8.buffer,res,rej);if(p&&p.catch)p.catch(rej);});
       await new Promise(res=>{
         const src=ac.createBufferSource();src.buffer=buf;
         const g=ac.createGain();g.gain.value=2.2;
@@ -1122,21 +1146,46 @@ async function speakCloud(text){
         vSrc=src;src.onended=res;src.start(0);
         setTimeout(res,Math.ceil(buf.duration*1000)+1500);
       });
-      played=true;
-    }
-  }catch(e){console.error("WebAudio play failed",e);}
-  if(!played){
-    await new Promise(res=>{
-      vAudio.onended=res;vAudio.onerror=()=>{ok=false;why="تعذر تشغيل الملف الصوتي";res();};
-      vAudio.src="data:"+(d.mime||"audio/mpeg")+";base64,"+d.audio;
-      vAudio.volume=1;
-      const p=vAudio.play();if(p&&p.catch)p.catch(e=>{ok=false;why="منع التشغيل: "+(e&&e.name||e);res();});
-      setTimeout(res,Math.max(8000,text.length*250));
-    });
+      return true;
+    }catch(e){console.error("WebAudio play failed",e);}
   }
-  if(!ok)toast("فشل الصوت البشري: "+why);
-  if(ok)resumeRecog();
+  let ok=true;
+  await new Promise(res=>{
+    vAudio.onended=res;vAudio.onerror=()=>{ok=false;res();};
+    vAudio.src="data:"+(d.mime||"audio/mpeg")+";base64,"+d.audio;
+    vAudio.volume=1;
+    const p=vAudio.play();if(p&&p.catch)p.catch(()=>{ok=false;res();});
+    setTimeout(res,8000);
+  });
   return ok;
+}
+async function speakCloud(text){
+  if(window.vCloudOK===false)return false;
+  text=String(text||"").replace(/```[\s\S]*?```/g," ").replace(/[\u{1F000}-\u{1FFFF}\u2600-\u27BF\uFE0F]/gu,"").replace(/\s+/g," ").trim().slice(0,500);
+  if(!text||!auth.currentUser)return false;
+  const chunks=ttsSplit(text);
+  if(!chunks.length)return false;
+  const fetches=chunks.map(c=>ttsFetch(c));
+  const decodes=fetches.map(f=>f.then(d=>d&&d.audio?ttsDecode(d):null));
+  const d0=await fetches[0];
+  if(!d0||!d0.audio){
+    toast(d0&&d0.fatal?d0.fatal:"فشل الصوت البشري: "+((d0&&d0.fail)||""));
+    return false;
+  }
+  if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
+  for(let i=0;i<chunks.length;i++){
+    const d=i===0?d0:await fetches[i];
+    if(!d||!d.audio){
+      const rest=chunks.slice(i).join(" ");
+      await speakDevice(rest);
+      return true;
+    }
+    const buf=await decodes[i];
+    const ok=await ttsPlay(d,buf);
+    if(!ok){toast("فشل الصوت البشري: تعذر تشغيل الملف الصوتي");break;}
+  }
+  if(vPhase1)startRecog();
+  return true;
 }
 let vVoicesReady=speechSynthesis.getVoices().length>0;
 if(!vVoicesReady)speechSynthesis.addEventListener("voiceschanged",()=>{vVoicesReady=true;},{once:true});
@@ -1152,10 +1201,8 @@ function pickArVoice(){
   return vs.find(v=>/^ar/i.test(v.lang))||vs.find(v=>/arab/i.test(v.name))||null;
 }
 async function speak(text){
-  try{
-    if(await speakCloud(text))return;
-    return await speakDevice(text);
-  }finally{if(vSpeaking)resumeRecog();}
+  if(await speakCloud(text))return;
+  return speakDevice(text);
 }
 async function speakDevice(text){
   if(!text)return;
@@ -1164,7 +1211,7 @@ async function speakDevice(text){
   await waitVoices();
   if(!pickArVoice())toast("لا يوجد صوت عربي في الجهاز، حمّله من الإعدادات");
   // نوقف الاستماع مؤقتاً أثناء كلام الذكاء الاصطناعي حتى لا يسمع صوت نفسه ويعيد تشغيل التعرف بالخطأ
-  pauseRecog();
+  if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
   return new Promise(res=>{
     try{
       speechSynthesis.cancel();
@@ -1173,7 +1220,7 @@ async function speakDevice(text){
       u.lang=(v&&v.lang)||"ar-SA";u.pitch=0.82;u.rate=1.0;u.volume=1;
       let done=false;
       const finish=()=>{if(done)return;done=true;
-        resumeRecog(); // نعيد تشغيل الاستماع بعد انتهاء الكلام
+        if(vPhase1)startRecog(); // نعيد تشغيل الاستماع بعد انتهاء الكلام
         res();
       };
       let started=false;u.onstart=()=>{started=true;};
@@ -1183,69 +1230,28 @@ async function speakDevice(text){
       setTimeout(finish, Math.max(2500, text.length*90));
       try{speechSynthesis.resume();}catch(e){}
       speechSynthesis.speak(u);
-    }catch(e){resumeRecog();res();}
+    }catch(e){if(vPhase1)startRecog();res();}
   });
 }
-let vSpeaking=false,vIgnoreUntil=0;
-function pauseRecog(){
-  vSpeaking=true;
-  if(IS_ANDROID)return; // على الأندرويد نبقي الاستماع شغالاً ونتجاهل النتائج لتجنب صوت التنبيه
-  if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
-}
-function resumeRecog(){
-  vIgnoreUntil=Date.now()+700;vSpeaking=false;
-  if(IS_ANDROID){if(vPhase1&&!vMuted&&!vRecog)startRecog();return;}
-  if(vPhase1&&!vMuted)setTimeout(()=>{if(vPhase1&&!vMuted)startRecog();},350);
-}
-const VOICE_SILENCE_MS=3000; // مدة الصمت (بالمللي ثانية) قبل إغلاق الميكروفون والرد
-let vBusy=false,vSilTimer=null,vPrev="",vSessText="";
-function resetTurn(){clearTimeout(vSilTimer);vSilTimer=null;vPrev="";vSessText="";}
-async function handleVoiceTurn(text){
-  setVS(text);
-  try{await ensureConv(text);touchConv();await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"user",text,at:serverTimestamp()});}catch(e){}
-  let ans=await matchReply(text);if(!ans){ans=await askAI(text,true);if(!ans&&window.aiLastError)toast("الوسيط: "+window.aiLastError);}ans=ans||FALLBACK;
-  try{await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"bot",text:ans,at:serverTimestamp()});}catch(e){}
-  await speak(ans);
-  if(vPhase1)setVS("");
-}
-async function flushTurn(){
-  vSilTimer=null;
-  const text=(vPrev+" "+vSessText).replace(/\s+/g," ").trim();
-  vPrev="";vSessText="";
-  if(!text||!vPhase1||vMuted||vSpeaking||vBusy)return;
-  vBusy=true;
-  // إغلاق الميكروفون من داخل التطبيق
-  if(vRecog){try{vRecog.onend=null;vRecog.abort?vRecog.abort():vRecog.stop();}catch(e){}vRecog=null;}
-  try{await handleVoiceTurn(text);}
-  catch(e){console.error("voice turn failed",e);}
-  finally{
-    vBusy=false;
-    if(vPhase1&&!vMuted&&!vSpeaking)setTimeout(()=>{if(vPhase1&&!vMuted&&!vRecog&&!vBusy&&!vSpeaking)startRecog();},300);
-  }
-}
 function startRecog(){
-  if(!SR||!vPhase1||vMuted)return;
+  if(!SR||!vPhase1)return;
   vRecog=new SR();vRecog.lang="ar-SA";vRecog.continuous=true;vRecog.interimResults=true;
-  const rc=vRecog;
-  vRecog.onresult=e=>{
-    if(vMuted||vSpeaking||vBusy||Date.now()<vIgnoreUntil)return;
-    let t="";
-    for(let i=0;i<e.results.length;i++)t+=(e.results[i][0].transcript||"")+" ";
-    vSessText=t.replace(/\s+/g," ").trim();
-    const all=(vPrev+" "+vSessText).trim();
-    if(!all)return;
-    try{setVS(all);}catch(_){}
-    clearTimeout(vSilTimer);vSilTimer=setTimeout(flushTurn,VOICE_SILENCE_MS);
+  vRecog.onresult=async e=>{
+    const r=e.results[e.results.length-1];if(!r.isFinal)return;
+    const text=(r[0].transcript||"").trim();if(!text||!vPhase1)return;
+    setVS(text);
+    const wP=(async()=>{try{await ensureConv(text);touchConv();await addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"user",text,at:serverTimestamp()});}catch(e){}})();
+    let ans=await matchReply(text);if(!ans){ans=await askAI(text,true);if(!ans&&window.aiLastError)toast("الوسيط: "+window.aiLastError);}ans=ans||FALLBACK;
+    wP.then(()=>addDoc(collection(db,"users",uid,"conversations",currentConvId,"messages"),{from:"bot",text:ans,at:serverTimestamp()})).catch(()=>{});
+    await speak(ans);
+    if(vPhase1)setVS("");
   };
   vRecog.onerror=(e)=>{if(e&&e.error&&e.error!=="no-speech"&&e.error!=="aborted")toast("خطأ الميكروفون: "+e.error);};
-  vRecog.onend=()=>{
-    vPrev=(vPrev+" "+vSessText).trim();vSessText="";
-    setTimeout(()=>{if(vPhase1&&!vMuted&&!vBusy&&vRecog===rc&&!speechSynthesis.speaking)try{rc.start();}catch(e){}},250);
-  };
+  vRecog.onend=()=>{if(vPhase1&&!speechSynthesis.speaking)try{vRecog.start();}catch(e){}};
   try{vRecog.start();}catch(e){}
 }
 function stopRecog(){
-  vPhase1=false;resetTurn();vBusy=false;
+  vPhase1=false;
   try{vAudio.pause();}catch(e){}
   try{if(vSrc)vSrc.stop();}catch(e){}
   if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}vRecog=null;}
@@ -1299,13 +1305,6 @@ function watchVideoReq(d){
   if(d.videoAnswer&&vicPc&&!vicPc.currentRemoteDescription){vicPc.setRemoteDescription(d.videoAnswer).catch(()=>{});}
   if(d.videoStatus==="ended"&&(vicActive||vicPc))vicEndCall(false);
 }
-async function callMic(){
-  try{
-    const n=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
-    if(vlocal)vlocal.getTracks().forEach(t=>t.stop());
-    vlocal=n;return true;
-  }catch(e){return !!vlocal;}
-}
 function watchJoin(){
   if(vJoinUnsub)return;
   vJoinUnsub=onSnapshot(doc(db,"calls",uid),async s=>{
@@ -1313,7 +1312,6 @@ function watchJoin(){
     if(!d||!d.adminOffer||vpc||vEnded)return;
     stopRecog();setVS("جارٍ التوصيل...");
     const jcid=d.joinCid;
-    if(!(await callMic()))return;
     vpc=new RTCPeerConnection(VCFG);
     vlocal.getTracks().forEach(t=>vpc.addTrack(t,vlocal));
     vpc.ontrack=e=>{vAud.srcObject=e.streams[0];vAud.play().catch(()=>{});watchLevel(e.streams[0]);};
@@ -1337,7 +1335,10 @@ function watchJoin(){
   });
 }
 async function startCall(){
-  if(!(await callMic())){toast("لازم تسمح للمايكروفون");return;}
+  if(!vlocal){
+    try{vlocal=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
+    catch(e){toast("لازم تسمح للمايكروفون");return;}
+  }
   $v("voW").style.display="none";$v("voL").style.display="flex";
   setVS("جارٍ الاتصال...");vMuted=false;$v("voMute").classList.remove("red");
   vcid=Date.now().toString(36);vPending=[];vEnded=false;
@@ -1617,11 +1618,11 @@ async function askAI(text,voice,images){
   }
   while(msgs.length&&msgs[0].role!=="user")msgs.shift();
   for(let attempt=0;attempt<2;attempt++){
-    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),30000);
+    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),20000);
     try{
       const idToken=await auth.currentUser.getIdToken(attempt>0);
       const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},signal:ctl.signal,
-        body:JSON.stringify({idToken,messages:msgs,system:(cfg.system||"")+"\n\nاستثناء مهم: عند كتابة أي كود برمجي ضعه دائماً داخل كتلة بهذا الشكل ```اسم_اللغة ثم الكود ثم ```، واشرح خارج الكتلة بنص عادي. وعندما يطلب المستخدم كتابة نص إبداعي أو طويل (قصة، مقال، رسالة، خطاب، قصيدة، منشور، فقرة) فاكتب جملة تمهيد قصيرة ثم ضع النص نفسه داخل كتلة ```writing ثم النص ثم ```. وإذا أرسل المستخدم صورة فانظر إليها بدقة وأجب عن سؤاله أو صفها.",images:(images&&images.length)?images:undefined,model:(!cfg.model||cfg.model==="gemini-2.5-flash"||cfg.model==="gemini-3-flash-preview")?"gemini-3.8-flash":cfg.model,temperature:cfg.temp,voice:!!voice})});
+        body:JSON.stringify({idToken,messages:msgs,system:(cfg.system||"")+(voice?"\n\nهذا رد صوتي: أجب بجملة أو جملتين قصيرتين فقط، بدون قوائم أو رموز أو كود.":"")+"\n\nاستثناء مهم: عند كتابة أي كود برمجي ضعه دائماً داخل كتلة بهذا الشكل ```اسم_اللغة ثم الكود ثم ```، واشرح خارج الكتلة بنص عادي. وعندما يطلب المستخدم كتابة نص إبداعي أو طويل (قصة، مقال، رسالة، خطاب، قصيدة، منشور، فقرة) فاكتب جملة تمهيد قصيرة ثم ضع النص نفسه داخل كتلة ```writing ثم النص ثم ```. وإذا أرسل المستخدم صورة فانظر إليها بدقة وأجب عن سؤاله أو صفها.",images:(images&&images.length)?images:undefined,model:(!cfg.model||cfg.model==="gemini-2.5-flash"||cfg.model==="gemini-3-flash-preview")?"gemini-3.8-flash":cfg.model,temperature:cfg.temp,voice:!!voice})});
       clearTimeout(tm);
       let d={};
       try{d=await r.json();}catch(e){}
@@ -1636,7 +1637,7 @@ async function askAI(text,voice,images){
       window.aiLastError="رد فارغ من الوسيط";
     }catch(e){
       clearTimeout(tm);
-      window.aiLastError=(e&&e.name==="AbortError")?"انتهت مهلة الوسيط (30 ث)":String(e&&e.message||e);
+      window.aiLastError=(e&&e.name==="AbortError")?"انتهت مهلة الوسيط (20 ث)":String(e&&e.message||e);
       console.error("AI proxy fetch failed:",e);
     }
   }
