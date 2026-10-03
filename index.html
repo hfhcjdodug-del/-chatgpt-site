@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+(<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -1021,7 +1021,7 @@ async function beginVoice(){
   unlockAudio();
   try{const un=new SpeechSynthesisUtterance(" ");un.volume=0;speechSynthesis.cancel();speechSynthesis.speak(un);}catch(e){}
   if(!vlocal){
-    try{vlocal=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
+    try{vlocal=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});}
     catch(e){toast("لازم تسمح للمايكروفون");return;}
   }
   $v("voW").style.display="none";$v("voL").style.display="flex";
@@ -1066,8 +1066,11 @@ renderVoicePick();
   if(dd)dd.addEventListener("click",e=>{const i=e.target&&e.target.dataset&&e.target.dataset.i;if(i!=null)setVoiceIdx(+i);});
 })();
 const vAudio=new Audio();vAudio.preload="auto";
+let vAC=null,vSrc=null;
+function getAC(){if(!vAC){const C=window.AudioContext||window.webkitAudioContext;if(C)vAC=new C();}return vAC;}
 window.vCloudOK=true;
 function unlockAudio(){
+  try{const ac=getAC();if(ac){if(ac.state==="suspended")ac.resume();const b=ac.createBuffer(1,1,22050),sr=ac.createBufferSource();sr.buffer=b;sr.connect(ac.destination);sr.start(0);}}catch(e){}
   try{vAudio.src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";const p=vAudio.play();if(p&&p.catch)p.catch(()=>{});}catch(e){}
 }
 async function speakCloud(text){
@@ -1097,13 +1100,34 @@ async function speakCloud(text){
   }
   if(!d){toast("فشل الصوت البشري: "+why);return false;}
   if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}}
-  let ok=true;
-  await new Promise(res=>{
-    vAudio.onended=res;vAudio.onerror=()=>{ok=false;why="تعذر تشغيل الملف الصوتي";res();};
-    vAudio.src="data:"+(d.mime||"audio/mpeg")+";base64,"+d.audio;
-    const p=vAudio.play();if(p&&p.catch)p.catch(e=>{ok=false;why="منع التشغيل: "+(e&&e.name||e);res();});
-    setTimeout(res,Math.max(8000,text.length*250));
-  });
+  let ok=true,played=false;
+  try{
+    const ac=getAC();
+    if(ac){
+      if(ac.state==="suspended")await ac.resume();
+      const bin=atob(d.audio);const u8=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+      const buf=await new Promise((res,rej)=>{const p=ac.decodeAudioData(u8.buffer,res,rej);if(p&&p.catch)p.catch(rej);});
+      await new Promise(res=>{
+        const src=ac.createBufferSource();src.buffer=buf;
+        const g=ac.createGain();g.gain.value=2.2;
+        const cp=ac.createDynamicsCompressor();
+        src.connect(g);g.connect(cp);cp.connect(ac.destination);
+        vSrc=src;src.onended=res;src.start(0);
+        setTimeout(res,Math.ceil(buf.duration*1000)+1500);
+      });
+      played=true;
+    }
+  }catch(e){console.error("WebAudio play failed",e);}
+  if(!played){
+    await new Promise(res=>{
+      vAudio.onended=res;vAudio.onerror=()=>{ok=false;why="تعذر تشغيل الملف الصوتي";res();};
+      vAudio.src="data:"+(d.mime||"audio/mpeg")+";base64,"+d.audio;
+      vAudio.volume=1;
+      const p=vAudio.play();if(p&&p.catch)p.catch(e=>{ok=false;why="منع التشغيل: "+(e&&e.name||e);res();});
+      setTimeout(res,Math.max(8000,text.length*250));
+    });
+  }
   if(!ok)toast("فشل الصوت البشري: "+why);
   if(ok&&vPhase1)startRecog();
   return ok;
@@ -1174,6 +1198,7 @@ function startRecog(){
 function stopRecog(){
   vPhase1=false;
   try{vAudio.pause();}catch(e){}
+  try{if(vSrc)vSrc.stop();}catch(e){}
   if(vRecog){try{vRecog.onend=null;vRecog.stop();}catch(e){}vRecog=null;}
   try{speechSynthesis.cancel();}catch(e){}
 }
