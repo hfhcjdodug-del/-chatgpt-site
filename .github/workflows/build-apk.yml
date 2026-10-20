@@ -53,7 +53,7 @@ jobs:
           PY
           cat "$M"
           flutter pub get
-          flutter build apk --release
+          flutter build apk --release --no-shrink
           ls -la build/app/outputs/flutter-apk/
 
       - name: Publish build log
