@@ -480,10 +480,8 @@ html.dark .tray,html.worm .tray{background:var(--bar);}
   <textarea id="edText" placeholder="اكتب هنا..."></textarea>
 </div>
 <script type="module">
-import {initializeApp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import {getAuth,initializeAuth,browserLocalPersistence,browserSessionPersistence,inMemoryPersistence,browserPopupRedirectResolver,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signInAnonymously,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import {getFirestore,doc,setDoc,updateDoc,addDoc,deleteDoc,getDoc,getDocs,collection,query,orderBy,onSnapshot,serverTimestamp,increment} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-const firebaseConfig={apiKey:"AIzaSyBk_hr_RSYRjTQww2KPwQcq42V1NzU7uH4",authDomain:"the-ai-ed920.firebaseapp.com",projectId:"the-ai-ed920",storageBucket:"the-ai-ed920.firebasestorage.app",messagingSenderId:"561611455865",appId:"1:561611455865:web:bb13aabf00f9f3eacf43a8"};
+import {initializeApp,getAuth,initializeAuth,browserLocalPersistence,browserSessionPersistence,inMemoryPersistence,browserPopupRedirectResolver,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signInAnonymously,onAuthStateChanged,signOut,getFirestore,doc,setDoc,updateDoc,addDoc,deleteDoc,getDoc,getDocs,collection,query,orderBy,onSnapshot,serverTimestamp,increment} from "./supa-shim.js";
+const firebaseConfig={};
 // ---- توافق WebView: بعض الـ APK لا يدعم الصوت المنطوق فيتوقف السكربت كاملاً ----
 if(!window.speechSynthesis){
   window.speechSynthesis={speaking:false,getVoices:()=>[],addEventListener(){},removeEventListener(){},speak(){},cancel(){}};
@@ -510,8 +508,8 @@ let authReady=false;
 function authMsg(e){
   const c=e.code||"";
   const m={
-    "auth/unauthorized-domain":"هذا الدومين غير مضاف في Firebase. أضف ("+location.hostname+") في Authentication ← Settings ← Authorized domains",
-    "auth/operation-not-allowed":"طريقة الدخول غير مفعّلة في Firebase (Authentication ← Sign-in method)",
+    "auth/unauthorized-domain":"هذا الدومين غير مضاف في Supabase. أضف ("+location.hostname+") في Authentication ← URL Configuration",
+    "auth/operation-not-allowed":"طريقة الدخول غير مفعّلة في Supabase (Authentication ← Sign In / Providers)",
     "auth/popup-closed-by-user":"أُغلقت نافذة الدخول قبل الإكمال، حاول مرة أخرى",
     "auth/cancelled-popup-request":"أُلغي الطلب، حاول مرة أخرى",
     "auth/popup-blocked":"المتصفح منع نافذة جوجل، اسمح بالنوافذ المنبثقة",
@@ -819,7 +817,7 @@ function setHeaderState(hasMsgs){
   document.getElementById("headerTitle").style.display=showTitle?"block":"none";
   try{renderWelcome();}catch(e){}
 }
-function newLocalConvId(){return "c"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function newLocalConvId(){return crypto.randomUUID();}
 let sbFilter="";
 function renderSidebarList(list){
   const box=document.getElementById("sbList");
