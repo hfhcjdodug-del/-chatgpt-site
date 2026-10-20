@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'kv_store.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,8 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _err = '';
     });
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('aiName', n);
+      await KvStore.instance.set('aiName', n);
       await Supabase.instance.client.auth.signInAnonymously();
     } catch (e) {
       final msg = e.toString();

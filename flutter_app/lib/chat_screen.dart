@@ -4,11 +4,11 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import 'config.dart';
+import 'kv_store.dart';
 
 typedef Rows = List<Map<String, dynamic>>;
 
@@ -70,8 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // ---------------- التهيئة ----------------
   Future<void> _init() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('aiName');
+      final saved = await KvStore.instance.get('aiName');
       final meta = sb.auth.currentUser?.userMetadata;
       final metaName = meta == null ? null : (meta['full_name'] ?? meta['name']);
       _name = (metaName is String && metaName.isNotEmpty)
@@ -335,8 +334,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _toggleTheme(bool dark) async {
     themeMode.value = dark ? ThemeMode.dark : ThemeMode.light;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('aiTheme', dark ? 'dark' : 'light');
+    await KvStore.instance.set('aiTheme', dark ? 'dark' : 'light');
   }
 
   void _scrollDown() {

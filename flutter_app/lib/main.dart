@@ -1,9 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'chat_screen.dart';
 import 'config.dart';
+import 'kv_store.dart';
 import 'login_screen.dart';
 
 void main() {
@@ -35,11 +37,37 @@ class _BootState extends State<Boot> {
   late final Future<void> _ready = _init();
 
   Future<void> _init() async {
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey)
-        .timeout(const Duration(seconds: 20));
-    final prefs = await SharedPreferences.getInstance();
-    themeMode.value =
-        prefs.getString('aiTheme') == 'dark' ? ThemeMode.dark : ThemeMode.light;
+    // لا نستخدم shared_preferences: نحفظ الجلسة بأنفسنا في ملف
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseKey,
+      authOptions: FlutterAuthClientOptions(
+        localStorage: const EmptyLocalStorage(),
+        pkceAsyncStorage: _MemAsyncStorage(),
+        authFlowType: AuthFlowType.implicit,
+      ),
+    ).timeout(const Duration(seconds: 20));
+
+    final auth = Supabase.instance.client.auth;
+    final saved = await KvStore.instance.get('session');
+    if (saved != null && saved.isNotEmpty) {
+      try {
+        await auth.recoverSession(saved);
+      } catch (_) {
+        await KvStore.instance.remove('session');
+      }
+    }
+    auth.onAuthStateChange.listen((state) {
+      final s = state.session;
+      if (s != null) {
+        KvStore.instance.set('session', jsonEncode(s.toJson()));
+      } else if (state.event == AuthChangeEvent.signedOut) {
+        KvStore.instance.remove('session');
+      }
+    });
+
+    final theme = await KvStore.instance.get('aiTheme');
+    themeMode.value = theme == 'dark' ? ThemeMode.dark : ThemeMode.light;
   }
 
   Widget _plain(Widget child) => MaterialApp(
@@ -122,5 +150,23 @@ class AuthGate extends StatelessWidget {
         return ChatScreen(key: ValueKey(session.user.id));
       },
     );
+  }
+}
+
+/// تخزين مؤقت في الذاكرة لتدفق PKCE (غير مستخدم عملياً مع الدخول المجهول)
+class _MemAsyncStorage extends GotrueAsyncStorage {
+  final Map<String, String> _m = {};
+
+  @override
+  Future<String?> getItem({required String key}) async => _m[key];
+
+  @override
+  Future<void> removeItem({required String key}) async {
+    _m.remove(key);
+  }
+
+  @override
+  Future<void> setItem({required String key, required String value}) async {
+    _m[key] = value;
   }
 }
