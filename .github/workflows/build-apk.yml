@@ -1,0 +1,71 @@
+name: Build APK
+
+on:
+  push:
+    branches: [flutter-app]
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/build-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build release APK
+        id: build
+        working-directory: flutter_app
+        shell: bash
+        run: |
+          set -eo pipefail
+          exec > >(tee "$GITHUB_WORKSPACE/build.log") 2>&1
+          flutter --version
+          # توليد هيكل أندرويد (لا يستبدل ملفاتنا الموجودة)
+          flutter create . --platforms=android --org com.mostafa.ai --project-name ai_chat
+          M=android/app/src/main/AndroidManifest.xml
+          # صلاحية الإنترنت في نسخة release
+          if ! grep -q 'android.permission.INTERNET' "$M"; then
+            sed -i '0,/<manifest[^>]*>/s//&\n    <uses-permission android:name="android.permission.INTERNET"\/>/' "$M"
+          fi
+          sed -i 's/android:label="[^"]*"/android:label="ChatGPT"/' "$M"
+          flutter pub get
+          flutter build apk --release
+          ls -la build/app/outputs/flutter-apk/
+
+      - name: Publish build log
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/logs
+          cp "$GITHUB_WORKSPACE/build.log" /tmp/logs/build.log 2>/dev/null || echo "no log" > /tmp/logs/build.log
+          echo "${{ job.status }}" > /tmp/logs/status.txt
+          cd /tmp/logs
+          git init -q
+          git checkout -q -b build-logs
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "build log ${{ github.run_number }} (${{ job.status }})"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" build-logs
+
+      - name: Publish release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: "ChatGPT APK #${{ github.run_number }}"
+          body: "تطبيق Android — حمّل app-release.apk وثبّته."
+          files: flutter_app/build/app/outputs/flutter-apk/app-release.apk

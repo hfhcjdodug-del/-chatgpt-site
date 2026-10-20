@@ -1,0 +1,18 @@
+name: ai_chat
+description: تطبيق الدردشة الذكي
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.5.0
+  http: ^1.2.0
+  shared_preferences: ^2.2.0
+  uuid: ^4.3.0
+
+flutter:
+  uses-material-design: true
