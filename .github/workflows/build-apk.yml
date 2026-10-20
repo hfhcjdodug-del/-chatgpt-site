@@ -53,8 +53,20 @@ jobs:
           PY
           cat "$M"
           flutter pub get
+          # توقيع ثابت: كل البناءات تُوقَّع بنفس المفتاح فتُحدَّث فوق بعضها
+          mkdir -p ~/.android
+          cp ci/debug.keystore ~/.android/debug.keystore
           flutter build apk --release --no-shrink
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          cp "$APK" "build/app/outputs/flutter-apk/chatgpt-v${GITHUB_RUN_NUMBER}.apk"
           ls -la build/app/outputs/flutter-apk/
+          # تشخيص الحزمة (الحد الأدنى لأندرويد + التوقيع)
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          BT=$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$BT" ]; then
+            echo "== badging =="; "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdk|native-code" || true
+            echo "== signature =="; "$BT/apksigner" verify --verbose --print-certs "$APK" 2>&1 | head -12 || true
+          fi
 
       - name: Publish build log
         if: always()
@@ -76,5 +88,5 @@ jobs:
         with:
           tag_name: apk-${{ github.run_number }}
           name: "ChatGPT APK #${{ github.run_number }}"
-          body: "تطبيق Android — حمّل app-release.apk وثبّته."
-          files: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          body: "تطبيق Android — حمّل ملف chatgpt-v${{ github.run_number }}.apk وثبّته."
+          files: flutter_app/build/app/outputs/flutter-apk/chatgpt-v${{ github.run_number }}.apk
