@@ -1,0 +1,110 @@
+build-tools: /usr/local/lib/android/sdk/build-tools/37.0.0
+/tmp/a2:
+total 52720
+drwxr-xr-x  2 runner runner     4096 Oct 20 22:31 .
+drwxrwxrwt 15 root   root       4096 Oct 20 22:31 ..
+-rw-r--r--  1 runner runner 53976631 Oct 20 22:31 app-release.apk
+
+/tmp/a5:
+total 52720
+drwxr-xr-x  2 runner runner     4096 Oct 20 22:31 .
+drwxrwxrwt 15 root   root       4096 Oct 20 22:31 ..
+-rw-r--r--  1 runner runner 53976635 Oct 20 22:31 chatgpt-v5.apk
+
+######## SDK LINES ########
+--- apk-2 ---
+package: name='com.mostafa.ai.ai_chat' versionCode='1' versionName='1.0.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+minSdkVersion:'24'
+targetSdkVersion:'36'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='com.mostafa.ai.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+application-label:'ChatGPT'
+launchable-activity: name='com.mostafa.ai.ai_chat.MainActivity'  label='' icon=''
+native-code: 'arm64-v8a' 'armeabi-v7a' 'x86_64'
+--- apk-5 ---
+package: name='com.mostafa.aichat.ai_chat' versionCode='1' versionName='1.0.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+minSdkVersion:'24'
+targetSdkVersion:'36'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='com.mostafa.aichat.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+application-label:'ChatGPT'
+launchable-activity: name='com.mostafa.aichat.ai_chat.MainActivity'  label='' icon=''
+native-code: 'arm64-v8a' 'armeabi-v7a' 'x86_64'
+
+######## SIGNATURE ########
+--- apk-2 ---
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V2 Signer: certificate DN: C=US, O=Android, CN=Android Debug
+V2 Signer: certificate SHA-256 digest: 623d2372faf3a6c612ffbd68f5babb539871d01b53377f1d247ae6a43e38d3fd
+V2 Signer: certificate SHA-1 digest: b5c80cc19db6eb70dd4ec4f933964fb1212259dc
+V2 Signer: certificate MD5 digest: 9e75219e5f2cc9ca6959f5b39e911d04
+V2 Signer: key algorithm: RSA
+--- apk-5 ---
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V2 Signer: certificate DN: C=US, O=Android, CN=Android Debug
+V2 Signer: certificate SHA-256 digest: 5b72858fa038dc8a726199e2d3cb23f4c39867396fd993dfed9286834c5a3a54
+V2 Signer: certificate SHA-1 digest: d5fc499c85f8486c69f1f00b0a36e5d799ff3e94
+V2 Signer: certificate MD5 digest: 9d72276efbffab75ab2cb29f4bcc82df
+V2 Signer: key algorithm: RSA
+
+######## ZIPALIGN (16KB pages) ########
+--- apk-2 ---
+53850012 res/zE.png (OK)
+53850380 res/zV.9.png (OK)
+53852888 resources.arsc (OK)
+Verification successful
+--- apk-5 ---
+53850016 res/zE.png (OK)
+53850384 res/zV.9.png (OK)
+53852892 resources.arsc (OK)
+Verification successful
+
+######## DIFF manifest (apk-2 vs apk-5) ########
+7c7
+<     A: package="com.mostafa.ai.ai_chat" (Raw: "com.mostafa.ai.ai_chat")
+---
+>     A: package="com.mostafa.aichat.ai_chat" (Raw: "com.mostafa.aichat.ai_chat")
+22c22
+<         A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.ai.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.mostafa.ai.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+---
+>         A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.aichat.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.mostafa.aichat.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+25c25
+<         A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.ai.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.mostafa.ai.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+---
+>         A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.aichat.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.mostafa.aichat.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+37c37
+<             A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.ai.ai_chat.MainActivity" (Raw: "com.mostafa.ai.ai_chat.MainActivity")
+---
+>             A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.aichat.ai_chat.MainActivity" (Raw: "com.mostafa.aichat.ai_chat.MainActivity")
+68c68
+<             A: http://schemas.android.com/apk/res/android:authorities(0x01010018)="com.mostafa.ai.ai_chat.androidx-startup" (Raw: "com.mostafa.ai.ai_chat.androidx-startup")
+---
+>             A: http://schemas.android.com/apk/res/android:authorities(0x01010018)="com.mostafa.aichat.ai_chat.androidx-startup" (Raw: "com.mostafa.aichat.ai_chat.androidx-startup")
+
+######## DIFF zip entries (apk-2 vs apk-5) ########
+1c1
+< AndroidManifest.xml method=8 size=6992
+---
+> AndroidManifest.xml method=8 size=7024
+67c67
+< classes.dex method=8 size=852912
+---
+> classes.dex method=8 size=852916
+
+######## DONE ########
