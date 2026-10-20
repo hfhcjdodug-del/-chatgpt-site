@@ -51,14 +51,27 @@ jobs:
           s = re.sub(r'android:label="[^"]*"', 'android:label="ChatGPT"', s, count=1)
           open(p, "w", encoding="utf-8").write(s)
           PY
+          python3 - <<'PY2'
+          import os, re
+          for f in ("android/app/build.gradle.kts", "android/app/build.gradle"):
+              if os.path.exists(f):
+                  s = open(f, encoding="utf-8").read()
+                  if "useLegacyPackaging" not in s:
+                      s = re.sub(r"(^android\s*\{)", r"\1\n    packaging { jniLibs { useLegacyPackaging = true } }", s, count=1, flags=re.M)
+                      open(f, "w", encoding="utf-8").write(s)
+                  print("== patched", f, "==")
+                  print("\n".join(s.splitlines()[:45]))
+          PY2
           cat "$M"
           flutter pub get
           # توقيع ثابت: كل البناءات تُوقَّع بنفس المفتاح فتُحدَّث فوق بعضها
           mkdir -p ~/.android
           cp ci/debug.keystore ~/.android/debug.keystore
-          flutter build apk --release --no-shrink
-          APK=build/app/outputs/flutter-apk/app-release.apk
-          cp "$APK" "build/app/outputs/flutter-apk/chatgpt-v${GITHUB_RUN_NUMBER}.apk"
+          flutter build apk --release --no-shrink --split-per-abi
+          O=build/app/outputs/flutter-apk
+          cp "$O/app-armeabi-v7a-release.apk" "$O/chatgpt-v${GITHUB_RUN_NUMBER}-arm32.apk"
+          cp "$O/app-arm64-v8a-release.apk" "$O/chatgpt-v${GITHUB_RUN_NUMBER}-arm64.apk"
+          APK="$O/app-arm64-v8a-release.apk"
           ls -la build/app/outputs/flutter-apk/
           # تشخيص الحزمة (الحد الأدنى لأندرويد + التوقيع)
           SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
@@ -88,5 +101,7 @@ jobs:
         with:
           tag_name: apk-${{ github.run_number }}
           name: "ChatGPT APK #${{ github.run_number }}"
-          body: "تطبيق Android — حمّل ملف chatgpt-v${{ github.run_number }}.apk وثبّته."
-          files: flutter_app/build/app/outputs/flutter-apk/chatgpt-v${{ github.run_number }}.apk
+          body: "تطبيق Android — جرّب arm32 أولاً ثم arm64."
+          files: |
+            flutter_app/build/app/outputs/flutter-apk/chatgpt-v${{ github.run_number }}-arm32.apk
+            flutter_app/build/app/outputs/flutter-apk/chatgpt-v${{ github.run_number }}-arm64.apk
