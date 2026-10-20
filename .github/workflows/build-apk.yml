@@ -38,11 +38,20 @@ jobs:
           # توليد هيكل أندرويد (لا يستبدل ملفاتنا الموجودة)
           flutter create . --platforms=android --org com.mostafa.ai --project-name ai_chat
           M=android/app/src/main/AndroidManifest.xml
+          python3 - "$M" <<'PY'
+          import re, sys
+          p = sys.argv[1]
+          s = open(p, encoding="utf-8").read()
           # صلاحية الإنترنت في نسخة release
-          if ! grep -q 'android.permission.INTERNET' "$M"; then
-            sed -i '0,/<manifest[^>]*>/s//&\n    <uses-permission android:name="android.permission.INTERNET"\/>/' "$M"
-          fi
-          sed -i 's/android:label="[^"]*"/android:label="ChatGPT"/' "$M"
+          if "android.permission.INTERNET" not in s:
+              s = re.sub(r"(<manifest[^>]*>)", r'\1\n    <uses-permission android:name="android.permission.INTERNET"/>', s, count=1)
+          # تعطيل Impeller: يسبب شاشة سوداء على بعض الأجهزة
+          if "EnableImpeller" not in s:
+              s = re.sub(r"(<application[^>]*>)", r'\1\n        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>', s, count=1)
+          s = re.sub(r'android:label="[^"]*"', 'android:label="ChatGPT"', s, count=1)
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+          cat "$M"
           flutter pub get
           flutter build apk --release
           ls -la build/app/outputs/flutter-apk/
