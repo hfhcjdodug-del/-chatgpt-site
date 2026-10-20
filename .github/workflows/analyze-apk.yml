@@ -1,0 +1,70 @@
+name: Analyze APK
+
+on:
+  push:
+    branches: [flutter-app]
+    paths:
+      - ".github/workflows/analyze-apk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare apk-2 (installed OK) with apk-5 (install fails)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          exec > >(tee /tmp/analysis.log) 2>&1
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          BT=$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)
+          echo "build-tools: $BT"
+          mkdir -p /tmp/a2 /tmp/a5
+          gh release download apk-2 --repo "$GITHUB_REPOSITORY" -p '*.apk' -D /tmp/a2
+          gh release download apk-5 --repo "$GITHUB_REPOSITORY" -p '*.apk' -D /tmp/a5
+          ls -la /tmp/a2 /tmp/a5
+          A2=$(ls /tmp/a2/*.apk | head -1)
+          A5=$(ls /tmp/a5/*.apk | head -1)
+          i=0
+          for A in "$A2" "$A5"; do
+            n=$([ $i -eq 0 ] && echo 2 || echo 5); i=$((i+1))
+            "$BT/aapt2" dump badging "$A" > /tmp/badging$n.txt 2>&1
+            "$BT/apksigner" verify -v --print-certs "$A" > /tmp/sig$n.txt 2>&1
+            "$BT/aapt2" dump xmltree --file AndroidManifest.xml "$A" > /tmp/man$n.txt 2>&1
+            python3 - "$A" > /tmp/zip$n.txt <<'PY'
+          import sys, zipfile
+          z = zipfile.ZipFile(sys.argv[1])
+          for i in sorted(z.infolist(), key=lambda x: x.filename):
+              if i.filename.startswith(("lib/", "classes", "AndroidManifest", "resources.arsc", "META-INF")):
+                  print(i.filename, "method=%d" % i.compress_type, "size=%d" % i.file_size)
+          PY
+            "$BT/zipalign" -c -P 16 -v 4 "$A" 2>&1 | tail -4 > /tmp/align$n.txt
+          done
+          echo; echo "######## SDK LINES ########"
+          for n in 2 5; do echo "--- apk-$n ---"; grep -iE "^package|sdkVersion|native-code|uses-permission|launchable|application-label:" /tmp/badging$n.txt; done
+          echo; echo "######## SIGNATURE ########"
+          for n in 2 5; do echo "--- apk-$n ---"; head -14 /tmp/sig$n.txt; done
+          echo; echo "######## ZIPALIGN (16KB pages) ########"
+          for n in 2 5; do echo "--- apk-$n ---"; cat /tmp/align$n.txt; done
+          echo; echo "######## DIFF manifest (apk-2 vs apk-5) ########"
+          diff /tmp/man2.txt /tmp/man5.txt | head -60
+          echo; echo "######## DIFF zip entries (apk-2 vs apk-5) ########"
+          diff /tmp/zip2.txt /tmp/zip5.txt | head -40
+          echo; echo "######## DONE ########"
+
+      - name: Publish analysis log
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/logs
+          cp /tmp/analysis.log /tmp/logs/analysis.log 2>/dev/null || echo "no log" > /tmp/logs/analysis.log
+          cd /tmp/logs
+          git init -q
+          git checkout -q -b analysis-logs
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "apk analysis"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" analysis-logs
