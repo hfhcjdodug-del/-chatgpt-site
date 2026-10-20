@@ -36,7 +36,7 @@ jobs:
           exec > >(tee "$GITHUB_WORKSPACE/build.log") 2>&1
           flutter --version
           # توليد هيكل أندرويد (لا يستبدل ملفاتنا الموجودة)
-          flutter create . --platforms=android --org com.mostafa.ai --project-name ai_chat
+          flutter create . --platforms=android --org com.mostafa.aichat --project-name ai_chat
           M=android/app/src/main/AndroidManifest.xml
           python3 - "$M" <<'PY'
           import re, sys
