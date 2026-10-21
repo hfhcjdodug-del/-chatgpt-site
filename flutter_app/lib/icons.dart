@@ -215,8 +215,9 @@ class Ic extends StatelessWidget {
 
 /// ثلاث نقاط عمودية ⋮
 class Dots3 extends StatelessWidget {
-  const Dots3({super.key, this.color = Colors.white});
+  const Dots3({super.key, this.color = Colors.white, this.size = 5});
   final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -224,9 +225,9 @@ class Dots3 extends StatelessWidget {
         children: [
           for (var k = 0; k < 3; k++)
             Container(
-              width: 5,
-              height: 5,
-              margin: const EdgeInsets.symmetric(vertical: 2),
+              width: size,
+              height: size,
+              margin: EdgeInsets.symmetric(vertical: size * 0.4),
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
         ],

@@ -315,8 +315,8 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           if (started)
             Container(
-              height: 46,
-              width: 142,
+              height: 44,
+              width: 92,
               decoration: BoxDecoration(color: pal.circle, borderRadius: BorderRadius.circular(24)),
               child: Row(
                 textDirection: TextDirection.ltr,
@@ -325,29 +325,30 @@ class _ChatScreenState extends State<ChatScreen> {
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _toast('قريباً'),
-                    child: const SizedBox(width: 44, height: 46, child: Center(child: Dots3())),
+                    child: const SizedBox(width: 40, height: 44, child: Center(child: Dots3(size: 4))),
                   ),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => _startNew(temp: _temp),
-                    child: SizedBox(width: 44, height: 46, child: Center(child: Ic('edit', size: 26, color: pal.fg))),
+                    child: SizedBox(width: 40, height: 44, child: Center(child: Ic('edit', size: 21, color: pal.fg))),
                   ),
                 ],
               ),
             )
           else
             CircleBtn(
+              size: 44,
               color: _temp ? pal.fg : pal.circle,
               onTap: () => _startNew(temp: !_temp),
-              child: Ic('temp', size: 28, color: _temp ? pal.bg : pal.fg),
+              child: Ic('temp', size: 23, color: _temp ? pal.bg : pal.fg),
             ),
           const Spacer(),
           if (!started && !_temp)
             GestureDetector(
               onTap: () => _plusModal(pal),
               child: Container(
-                height: 46,
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
                   color: pal.pill,
                   borderRadius: BorderRadius.circular(24),
@@ -357,18 +358,19 @@ class _ChatScreenState extends State<ChatScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('اشترك في Plus',
-                        style: TextStyle(color: pal.pillt, fontSize: 17, fontWeight: FontWeight.w700)),
-                    const SizedBox(width: 8),
-                    CustomPaint(size: const Size(20, 20), painter: SparklePainter(pal.pillt)),
+                        style: TextStyle(color: pal.pillt, fontSize: 15.5, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 7),
+                    CustomPaint(size: const Size(15, 15), painter: SparklePainter(pal.pillt)),
                   ],
                 ),
               ),
             ),
           if (!started && !_temp) const SizedBox(width: 10),
           CircleBtn(
+            size: 44,
             color: pal.circle,
             onTap: () => _scaffold.currentState?.openDrawer(),
-            child: Ic('menu', size: 28, color: pal.fg),
+            child: Ic('menu', size: 22, color: pal.fg),
           ),
         ],
       ),
@@ -431,17 +433,17 @@ class _ChatScreenState extends State<ChatScreen> {
     if (rows.isEmpty && _waiting == 0) return _welcomeView(pal);
     return ListView.builder(
       controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       itemCount: rows.length + (_waiting > 0 ? 1 : 0),
       itemBuilder: (c, i) {
         if (i >= rows.length) {
           return Align(
             alignment: AlignmentDirectional.centerStart,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 14, 4, 14),
+              padding: const EdgeInsets.fromLTRB(0, 12, 0, 12),
               child: Container(
-                width: 22,
-                height: 22,
+                width: 14,
+                height: 14,
                 decoration: const BoxDecoration(color: Color(0xFFB8C8FF), shape: BoxShape.circle),
               ),
             ),
@@ -461,10 +463,10 @@ class _ChatScreenState extends State<ChatScreen> {
       child: GestureDetector(
         onLongPress: () => _copy(text),
         child: Container(
-          margin: const EdgeInsets.only(top: 8, bottom: 8, right: 56),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
-          decoration: BoxDecoration(color: pal.bub, borderRadius: BorderRadius.circular(30)),
-          child: SelectableText(text, textAlign: TextAlign.right, style: TextStyle(color: pal.bubt, fontSize: 18, fontWeight: FontWeight.w500, height: 1.4)),
+          margin: const EdgeInsets.only(top: 6, bottom: 14, right: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+          decoration: BoxDecoration(color: pal.bub, borderRadius: BorderRadius.circular(20)),
+          child: SelectableText(text, textAlign: TextAlign.right, style: TextStyle(color: pal.bubt, fontSize: 17, fontWeight: FontWeight.w500, height: 1.4)),
         ),
       ),
     );
@@ -569,8 +571,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 behavior: HitTestBehavior.opaque,
                 onTap: f,
                 child: Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 26),
-                  child: Ic(n, size: 24, color: col ?? pal.mut),
+                  padding: const EdgeInsetsDirectional.only(end: 18),
+                  child: Ic(n, size: 18, color: col ?? pal.mut),
                 ),
               );
           return Row(
@@ -583,7 +585,7 @@ class _ChatScreenState extends State<ChatScreen> {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _toast('قريباً'),
-                child: Padding(padding: const EdgeInsetsDirectional.only(end: 6), child: Dots3(color: pal.mut)),
+                child: Padding(padding: const EdgeInsetsDirectional.only(end: 6), child: Dots3(color: pal.mut, size: 3.5)),
               ),
             ],
           );
@@ -712,10 +714,10 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(height: 6),
         ],
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+          padding: const EdgeInsets.fromLTRB(13, 6, 13, 12),
           child: Container(
-            height: 58,
-            padding: const EdgeInsets.symmetric(horizontal: 5),
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(color: pal.bar, borderRadius: BorderRadius.circular(30)),
             child: Row(
               textDirection: TextDirection.ltr,
@@ -728,21 +730,21 @@ class _ChatScreenState extends State<ChatScreen> {
                           })
                       : (_hasText ? () => _send() : _openVoice),
                   child: Container(
-                    width: 48,
-                    height: 48,
+                    width: 34,
+                    height: 34,
                     decoration: const BoxDecoration(color: Pal.blue, shape: BoxShape.circle),
                     alignment: Alignment.center,
-                    child: Ic(gen ? 'stop' : (_hasText ? 'up' : 'wave'), size: gen ? 20 : 26, color: Colors.white),
+                    child: Ic(gen ? 'stop' : (_hasText ? 'up' : 'wave'), size: gen ? 13 : 19, color: Colors.white),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 18),
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: _dictate,
                   child: SizedBox(
-                    width: 30,
+                    width: 26,
                     height: 44,
-                    child: Center(child: Ic('mic', size: 28, color: _dictating ? Pal.blue : pal.fg)),
+                    child: Center(child: Ic('mic', size: 22, color: _dictating ? Pal.blue : pal.fg)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -752,13 +754,13 @@ class _ChatScreenState extends State<ChatScreen> {
                     focusNode: _focus,
                     textDirection: TextDirection.rtl,
                     textAlign: TextAlign.right,
-                    style: TextStyle(color: pal.fg, fontSize: 17, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: pal.fg, fontSize: 16.5, fontWeight: FontWeight.w600),
                     cursorColor: pal.fg,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _send(),
                     decoration: InputDecoration(
                       hintText: hint,
-                      hintStyle: TextStyle(color: pal.mut, fontSize: 17, fontWeight: FontWeight.w600),
+                      hintStyle: TextStyle(color: pal.mut, fontSize: 16.5, fontWeight: FontWeight.w600),
                       border: InputBorder.none,
                       isCollapsed: true,
                     ),
@@ -767,7 +769,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => setState(() => _plusOpen = !_plusOpen),
-                  child: SizedBox(width: 46, height: 46, child: Center(child: Ic('plus', size: 30, color: pal.fg))),
+                  child: SizedBox(width: 44, height: 44, child: Center(child: Ic('plus', size: 21, color: pal.fg))),
                 ),
               ],
             ),
