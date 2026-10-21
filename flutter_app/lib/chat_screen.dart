@@ -31,7 +31,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String? _convId;
   bool _convIsNew = true;
-  Stream<Rows>? _msgStream;
+  StreamSubscription<Rows>? _msgSub;
   late final Stream<Rows> _convStream;
   Rows _msgs = [];
   int _waiting = 0;
@@ -75,6 +75,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _beat?.cancel();
     _input.dispose();
     _player.dispose();
+    _msgSub?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -131,6 +132,17 @@ class _ChatScreenState extends State<ChatScreen> {
   Stream<Rows> _watch(String cid) =>
       sb.from('messages').stream(primaryKey: ['id']).eq('conv_id', cid).order('at', ascending: true);
 
+  void _subscribe(String? id) {
+    _msgSub?.cancel();
+    _msgSub = null;
+    if (id == null) return;
+    _msgSub = _watch(id).listen((rows) {
+      if (!mounted || _convId != id) return;
+      setState(() => _msgs = rows);
+      if (rows.isNotEmpty) _scrollEnd();
+    }, onError: (_) {});
+  }
+
   void _startNew({bool temp = false}) {
     final id = const Uuid().v4();
     setState(() {
@@ -138,7 +150,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _convIsNew = true;
       _temp = temp;
       _msgs = [];
-      _msgStream = temp ? null : _watch(id);
+      _subscribe(temp ? null : id);
       _tempMsgs.clear();
     });
   }
@@ -149,7 +161,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _convIsNew = false;
       _temp = false;
       _msgs = [];
-      _msgStream = _watch(id);
+      _subscribe(id);
     });
   }
 
@@ -406,25 +418,14 @@ class _ChatScreenState extends State<ChatScreen> {
       listenOptions: SpeechListenOptions(partialResults: true, listenMode: ListenMode.dictation),
       onResult: (r) {
         final t = r.recognizedWords;
+        if (r.finalResult && mounted) setState(() => _dictating = false);
         _input.text = base.isEmpty ? t : '$base $t';
         _input.selection = TextSelection.collapsed(offset: _input.text.length);
       },
     );
   }
 
-  Widget _body(Pal pal) {
-    if (_temp) return _list(pal, _tempMsgs);
-    return StreamBuilder<Rows>(
-      stream: _msgStream,
-      builder: (c, snap) {
-        if (snap.hasData) {
-          _msgs = snap.data!;
-          if (_msgs.isNotEmpty) _scrollEnd();
-        }
-        return _list(pal, _msgs);
-      },
-    );
-  }
+  Widget _body(Pal pal) => _list(pal, _temp ? _tempMsgs : _msgs);
 
   Widget _list(Pal pal, Rows rows) {
     if (rows.isEmpty && _waiting == 0) return _welcomeView(pal);
