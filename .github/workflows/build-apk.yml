@@ -71,7 +71,7 @@ jobs:
           # توقيع ثابت: كل البناءات تُوقَّع بنفس المفتاح فتُحدَّث فوق بعضها
           mkdir -p ~/.android
           cp ci/debug.keystore ~/.android/debug.keystore
-          flutter build apk --release --no-shrink --split-per-abi
+          flutter build apk --release --no-shrink --split-per-abi --build-number="${GITHUB_RUN_NUMBER}" --dart-define=BUILD_NO="${GITHUB_RUN_NUMBER}"
           O=build/app/outputs/flutter-apk
           cp "$O/app-armeabi-v7a-release.apk" "$O/chatgpt-v${GITHUB_RUN_NUMBER}-arm32.apk"
           cp "$O/app-arm64-v8a-release.apk" "$O/chatgpt-v${GITHUB_RUN_NUMBER}-arm64.apk"

@@ -827,6 +827,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     ])
                   : Row(children: [
                       Text('ChatGPT', style: TextStyle(color: pal.fg, fontSize: 24, fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 8),
+                      Text('v${const String.fromEnvironment('BUILD_NO', defaultValue: '?')}', style: TextStyle(color: pal.mut, fontSize: 12)),
                       const Spacer(),
                       CircleBtn(
                           color: pal.circle,
