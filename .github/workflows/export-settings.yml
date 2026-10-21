@@ -1,0 +1,90 @@
+name: Export old settings
+
+on:
+  push:
+    branches: [flutter-app]
+    paths:
+      - ".github/workflows/export-settings.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read old Firestore settings (read-only) and print a summary
+        shell: bash
+        run: |
+          set +e
+          exec > >(tee /tmp/summary.log) 2>&1
+          python3 - <<'PY'
+          import json, urllib.request, urllib.error
+          KEY = "AIzaSyBk_hr_RSYRjTQww2KPwQcq42V1NzU7uH4"
+          PROJ = "the-ai-ed920"
+
+          def call(url, data=None, token=None):
+              req = urllib.request.Request(url, data=json.dumps(data).encode() if data is not None else None,
+                                           headers={"Content-Type": "application/json"})
+              if token:
+                  req.add_header("Authorization", "Bearer " + token)
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as r:
+                      return r.status, json.loads(r.read().decode())
+              except urllib.error.HTTPError as e:
+                  return e.code, {"error": e.read().decode()[:300]}
+
+          st, j = call("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + KEY, {"returnSecureToken": True})
+          print("anonymous sign-in status:", st)
+          if st != 200:
+              print(j); raise SystemExit
+          tok = j["idToken"]
+
+          def plain(v):
+              if "stringValue" in v: return v["stringValue"]
+              if "integerValue" in v: return int(v["integerValue"])
+              if "doubleValue" in v: return v["doubleValue"]
+              if "booleanValue" in v: return v["booleanValue"]
+              if "nullValue" in v: return None
+              if "timestampValue" in v: return v["timestampValue"]
+              if "mapValue" in v: return {k: plain(x) for k, x in v["mapValue"].get("fields", {}).items()}
+              if "arrayValue" in v: return [plain(x) for x in v["arrayValue"].get("values", [])]
+              return str(v)[:50]
+
+          def list_col(name):
+              out, page = [], ""
+              while True:
+                  url = f"https://firestore.googleapis.com/v1/projects/{PROJ}/databases/(default)/documents/{name}?pageSize=300" + (("&pageToken=" + page) if page else "")
+                  st, j = call(url, token=tok)
+                  if st != 200:
+                      print(name, "status", st, str(j)[:200]); return out
+                  for d in j.get("documents", []):
+                      out.append((d["name"].split("/")[-1], {k: plain(v) for k, v in d.get("fields", {}).items()}))
+                  page = j.get("nextPageToken", "")
+                  if not page: return out
+
+          def show(v):
+              if isinstance(v, str):
+                  return f"<str {len(v)} chars, starts '{v[:22]}'>" if len(v) > 60 else repr(v)
+              if isinstance(v, (dict, list)):
+                  s = json.dumps(v, ensure_ascii=False)
+                  return f"<{type(v).__name__} {len(s)} chars>" if len(s) > 120 else s
+              return repr(v)
+
+          settings = list_col("settings")
+          print("settings docs:", len(settings))
+          for i, d in sorted(settings):
+              print("-", i, "{" + ", ".join(f"{k}: {show(v)}" for k, v in d.items()) + "}")
+          replies = list_col("replies")
+          print("replies docs:", len(replies))
+          json.dump({"settings": settings, "replies": replies}, open("/tmp/export.json", "w"), ensure_ascii=False)
+          PY
+
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/logs && cp /tmp/summary.log /tmp/logs/summary.log 2>/dev/null || echo none > /tmp/logs/summary.log
+          cd /tmp/logs && git init -q && git checkout -q -b export-logs && git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "export summary"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" export-logs
