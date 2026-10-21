@@ -67,13 +67,13 @@ class _BootState extends State<Boot> {
     });
 
     final theme = await KvStore.instance.get('aiTheme');
-    themeMode.value = theme == 'dark' ? ThemeMode.dark : ThemeMode.light;
+    themeMode.value = theme == 'light' ? ThemeMode.light : ThemeMode.dark;
   }
 
   Widget _plain(Widget child) => MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: Colors.black,
           body: SafeArea(child: Center(child: child)),
         ),
       );
@@ -124,7 +124,7 @@ class AiApp extends StatelessWidget {
             brightness: Brightness.dark,
             useMaterial3: true,
             colorSchemeSeed: const Color(0xFF1173D4),
-            scaffoldBackgroundColor: const Color(0xFF212121),
+            scaffoldBackgroundColor: Colors.black,
           ),
           builder: (context, child) => Directionality(
             textDirection: TextDirection.rtl,

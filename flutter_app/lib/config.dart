@@ -8,4 +8,4 @@ const supabaseKey = 'sb_publishable_i4FV3xGkbSxcXk9Givr60A_GzKrA8yS';
 const defaultAiUrl = 'https://small-snow-a143.jadocool0427.workers.dev/';
 
 // وضع الثيم (فاتح / داكن)
-final ValueNotifier<ThemeMode> themeMode = ValueNotifier<ThemeMode>(ThemeMode.light);
+final ValueNotifier<ThemeMode> themeMode = ValueNotifier<ThemeMode>(ThemeMode.dark);

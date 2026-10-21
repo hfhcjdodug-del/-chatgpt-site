@@ -48,6 +48,10 @@ jobs:
           # تعطيل Impeller: يسبب شاشة سوداء على بعض الأجهزة
           if "EnableImpeller" not in s:
               s = re.sub(r"(<application[^>]*>)", r'\1\n        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>', s, count=1)
+          if "RECORD_AUDIO" not in s:
+              s = re.sub(r"(<manifest[^>]*>)", r'\1\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>', s, count=1)
+          if "RecognitionService" not in s:
+              s = s.replace("</manifest>", '    <queries>\n        <intent><action android:name="android.speech.RecognitionService"/></intent>\n    </queries>\n</manifest>')
           s = re.sub(r'android:label="[^"]*"', 'android:label="ChatGPT"', s, count=1)
           open(p, "w", encoding="utf-8").write(s)
           PY

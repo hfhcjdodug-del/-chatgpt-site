@@ -12,6 +12,8 @@ dependencies:
   supabase_flutter: ^2.5.0
   http: ^1.2.0
   uuid: ^4.3.0
+  speech_to_text: ^7.0.0
+  audioplayers: ^6.1.0
 
 flutter:
   uses-material-design: true

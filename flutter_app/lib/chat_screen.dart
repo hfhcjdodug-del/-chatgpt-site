@@ -1,16 +1,16 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import 'config.dart';
+import 'icons.dart';
 import 'kv_store.dart';
-
-typedef Rows = List<Map<String, dynamic>>;
+import 'services.dart';
+import 'theme.dart';
+import 'voice_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -22,9 +22,9 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final SupabaseClient sb = Supabase.instance.client;
   late final String uid;
+  final GlobalKey<ScaffoldState> _scaffold = GlobalKey<ScaffoldState>();
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
-  final Random _rand = Random();
 
   String? _convId;
   bool _convIsNew = true;
@@ -33,16 +33,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Rows _msgs = [];
   int _waiting = 0;
   Timer? _beat;
-  String _welcome = 'أنا جاهز متى شئت.';
   String _name = 'مستخدم';
-
-  static const List<String> _fallbacks = [
-    'تمام 👍',
-    'فهمتك، كمّل 🌷',
-    'فكرة حلوة، شنو رايك أكثر؟',
-    'أوكي، خبرني أكثر عن هذا الموضوع',
-    'ممم، مثير للاهتمام 🤔',
-  ];
+  String _title = 'أنا جاهز متى شئت.';
+  List<Map<String, String>> _chips = const [];
+  bool _hasText = false;
+  bool _temp = false;
 
   @override
   void initState() {
@@ -53,9 +48,11 @@ class _ChatScreenState extends State<ChatScreen> {
         .stream(primaryKey: ['id'])
         .eq('user_id', uid)
         .order('last_at', ascending: false);
-    _convId = const Uuid().v4();
-    _convIsNew = true;
-    _msgStream = _watch(_convId!);
+    _startNew();
+    _input.addListener(() {
+      final h = _input.text.trim().isNotEmpty;
+      if (h != _hasText) setState(() => _hasText = h);
+    });
     _init();
   }
 
@@ -67,7 +64,6 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  // ---------------- التهيئة ----------------
   Future<void> _init() async {
     try {
       final saved = await KvStore.instance.get('aiName');
@@ -107,29 +103,28 @@ class _ChatScreenState extends State<ChatScreen> {
             .then((_) {}, onError: (_) {});
       });
     } catch (_) {}
-    try {
-      final w = await sb.from('settings').select('data').eq('id', 'welcome').maybeSingle();
-      final d = w?['data'];
-      if (d is Map && d['title'] is String && (d['title'] as String).trim().isNotEmpty) {
-        if (mounted) setState(() => _welcome = (d['title'] as String).trim());
-      }
-    } catch (_) {}
+    final w = await Svc.loadWelcome();
+    if (mounted) {
+      setState(() {
+        _title = w.title;
+        _chips = w.items;
+      });
+    }
   }
 
   // ---------------- المحادثات ----------------
-  Stream<Rows> _watch(String cid) => sb
-      .from('messages')
-      .stream(primaryKey: ['id'])
-      .eq('conv_id', cid)
-      .order('at', ascending: true);
+  Stream<Rows> _watch(String cid) =>
+      sb.from('messages').stream(primaryKey: ['id']).eq('conv_id', cid).order('at', ascending: true);
 
-  void _startNew() {
+  void _startNew({bool temp = false}) {
     final id = const Uuid().v4();
     setState(() {
       _convId = id;
       _convIsNew = true;
+      _temp = temp;
       _msgs = [];
-      _msgStream = _watch(id);
+      _msgStream = temp ? null : _watch(id);
+      _tempMsgs.clear();
     });
   }
 
@@ -137,318 +132,385 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _convId = id;
       _convIsNew = false;
+      _temp = false;
       _msgs = [];
       _msgStream = _watch(id);
     });
   }
 
-  // ---------------- الإرسال ----------------
-  String _norm(String s) {
-    var t = s.toLowerCase();
-    t = t.replaceAll(RegExp(r'[ً-ٟ]'), '');
-    t = t.replaceAll(RegExp(r'[أإآ]'), 'ا').replaceAll('ة', 'ه').replaceAll('ى', 'ي');
-    return t;
+  // رسائل المحادثة المؤقتة (لا تُحفظ)
+  final Rows _tempMsgs = [];
+
+  void _scrollEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+      }
+    });
   }
 
-  Future<String?> _matchReply(String text) async {
-    try {
-      final rows = await sb.from('replies').select('keywords,answer');
-      final t = _norm(text);
-      String? best;
-      var len = 0;
-      for (final r in rows) {
-        final kw = r['keywords'];
-        final an = r['answer'];
-        if (kw is! String || an is! String) continue;
-        final keys = kw
-            .split(RegExp(r'[,،\n]'))
-            .map((x) => _norm(x.trim()))
-            .where((x) => x.isNotEmpty);
-        for (final k in keys) {
-          if (t.contains(k) && k.length > len) {
-            best = an;
-            len = k.length;
-          }
-        }
-      }
-      if (best != null && best.contains('|||')) {
-        final v = best.split('|||').map((x) => x.trim()).where((x) => x.isNotEmpty).toList();
-        if (v.isNotEmpty) best = v[_rand.nextInt(v.length)];
-      }
-      return best;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<String?> _askAi(String text) async {
-    try {
-      final cfgRow = await sb.from('settings').select('data').eq('id', 'ai').maybeSingle();
-      final raw = cfgRow?['data'];
-      final cfg = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
-      if (cfg['on'] == false) return null;
-      final cu = cfg['url'];
-      final url = (cu is String && cu.startsWith('https://')) ? cu : defaultAiUrl;
-
-      final msgs = <Map<String, String>>[];
-      final recent = _msgs.length > 24 ? _msgs.sublist(_msgs.length - 24) : _msgs;
-      for (final m in recent) {
-        final role = m['sender'] == 'user' ? 'user' : 'model';
-        final t = (m['text'] ?? '').toString();
-        if (t.isEmpty) continue;
-        if (msgs.isNotEmpty && msgs.last['role'] == role) {
-          msgs.last['text'] = '${msgs.last['text']}\n$t';
-        } else {
-          msgs.add({'role': role, 'text': t});
-        }
-      }
-      if (msgs.isNotEmpty && msgs.last['role'] == 'user') {
-        if (!(msgs.last['text'] ?? '').endsWith(text)) {
-          msgs.last['text'] = '${msgs.last['text']}\n$text';
-        }
-      } else {
-        msgs.add({'role': 'user', 'text': text});
-      }
-      while (msgs.isNotEmpty && msgs.first['role'] != 'user') {
-        msgs.removeAt(0);
-      }
-
-      final token = sb.auth.currentSession?.accessToken;
-      final body = jsonEncode({
-        'idToken': token,
-        'messages': msgs,
-        'system': (cfg['system'] ?? '').toString(),
-        'temperature': cfg['temp'] is num ? cfg['temp'] : 0.8,
-        'model': (cfg['model'] ?? '').toString(),
-      });
-      final r = await http
-          .post(Uri.parse(url), headers: {'Content-Type': 'application/json'}, body: body)
-          .timeout(const Duration(seconds: 25));
-      final d = jsonDecode(utf8.decode(r.bodyBytes));
-      if (r.statusCode == 200 && d is Map && d['text'] is String && (d['text'] as String).isNotEmpty) {
-        return d['text'] as String;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _bumpProfile(String text, int now) async {
-    try {
-      final p = await sb.from('profiles').select('unread').eq('id', uid).maybeSingle();
-      final u = (p?['unread'] is num) ? (p!['unread'] as num).toInt() : 0;
-      await sb.from('profiles').update({
-        'last_message': text,
-        'last_at': now,
-        'unread': u + 1,
-      }).eq('id', uid);
-    } catch (_) {}
-  }
-
-  Future<void> _send() async {
-    final text = _input.text.trim();
-    if (text.isEmpty) return;
-    _input.clear();
-    final cid = _convId;
-    if (cid == null) return;
+  // ---------------- معالجة الرسالة (نص أو صوت) ----------------
+  Future<String> _process(String text, {bool voice = false, String? preset}) async {
+    final cid = _convId!;
     final now = DateTime.now().millisecondsSinceEpoch;
-    try {
-      if (_convIsNew) {
-        _convIsNew = false;
-        await sb.from('conversations').upsert({
-          'id': cid,
-          'user_id': uid,
-          'title': text.length > 40 ? text.substring(0, 40) : text,
-          'created_at': now,
-          'last_at': now,
-        });
-      } else {
-        await sb.from('conversations').update({'last_at': now}).eq('id', cid);
-      }
-      await sb.from('messages').insert({
-        'user_id': uid,
-        'conv_id': cid,
-        'sender': 'user',
-        'text': text,
+    if (_temp) {
+      final hist = List<Map<String, dynamic>>.from(_tempMsgs);
+      setState(() {
+        _tempMsgs.add({'sender': 'user', 'text': text});
+        _waiting++;
       });
-      _bumpProfile(text, now);
-
-      if (mounted) setState(() => _waiting++);
+      _scrollEnd();
       try {
-        String? ans = await _matchReply(text);
-        final Future<String?>? aiF = ans == null ? _askAi(text) : null;
-
-        // إذا المشرف يرد بنفسه أو المستخدم داخل مكالمة فلا يرد البوت
-        final p = await sb
-            .from('profiles')
-            .select('in_call,human_until')
-            .eq('id', uid)
-            .maybeSingle();
-        final hu = (p?['human_until'] is num) ? (p!['human_until'] as num).toInt() : 0;
-        final human = p != null &&
-            (p['in_call'] == true || hu > DateTime.now().millisecondsSinceEpoch);
-        if (human) return;
-
-        if (aiF != null) {
-          ans = await aiF;
-        } else {
-          await Future.delayed(const Duration(milliseconds: 150));
-        }
-        await sb.from('messages').insert({
-          'user_id': uid,
-          'conv_id': cid,
-          'sender': 'bot',
-          'text': ans ?? _fallbacks[_rand.nextInt(_fallbacks.length)],
-        });
+        final ans = preset ?? await Svc.matchReply(text) ?? await Svc.askAi(hist, text, voice: voice) ?? 'تمام 👍';
+        if (mounted) setState(() => _tempMsgs.add({'sender': 'bot', 'text': ans}));
+        _scrollEnd();
+        return ans;
       } finally {
         if (mounted) setState(() => _waiting--);
       }
+    }
+    if (_convIsNew) {
+      _convIsNew = false;
+      await sb.from('conversations').upsert({
+        'id': cid,
+        'user_id': uid,
+        'title': text.length > 40 ? text.substring(0, 40) : text,
+        'created_at': now,
+        'last_at': now,
+      });
+    } else {
+      await sb.from('conversations').update({'last_at': now}).eq('id', cid);
+    }
+    final hist = List<Map<String, dynamic>>.from(_msgs);
+    await sb.from('messages').insert({'user_id': uid, 'conv_id': cid, 'sender': 'user', 'text': text});
+    _bump(text, now);
+    if (mounted) setState(() => _waiting++);
+    try {
+      String? ans = preset ?? await Svc.matchReply(text);
+      final aiF = ans == null ? Svc.askAi(hist, text, voice: voice) : null;
+      final p = await sb.from('profiles').select('in_call,human_until').eq('id', uid).maybeSingle();
+      final hu = (p?['human_until'] is num) ? (p!['human_until'] as num).toInt() : 0;
+      final human = p != null && (p['in_call'] == true || hu > DateTime.now().millisecondsSinceEpoch);
+      if (human) return '';
+      if (aiF != null) ans = await aiF;
+      if (ans == null) {
+        ans = 'تعذّر الاتصال بالذكاء الاصطناعي${Svc.lastError.isEmpty ? '' : ' (${Svc.lastError})'}';
+      }
+      await sb.from('messages').insert({'user_id': uid, 'conv_id': cid, 'sender': 'bot', 'text': ans});
+      return ans;
+    } finally {
+      if (mounted) setState(() => _waiting--);
+    }
+  }
+
+  Future<void> _bump(String text, int now) async {
+    try {
+      final p = await sb.from('profiles').select('unread').eq('id', uid).maybeSingle();
+      final u = (p?['unread'] is num) ? (p!['unread'] as num).toInt() : 0;
+      await sb
+          .from('profiles')
+          .update({'last_message': text, 'last_at': now, 'unread': u + 1}).eq('id', uid);
+    } catch (_) {}
+  }
+
+  Future<void> _send({String? text, String? preset}) async {
+    final t = (text ?? _input.text).trim();
+    if (t.isEmpty) return;
+    _input.clear();
+    try {
+      await _process(t, preset: preset == null ? null : Svc.pickVariant(preset));
     } catch (e) {
       _toast('تعذر الإرسال: $e');
     }
   }
 
+  void _openVoice() {
+    Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: VoiceScreen(onUser: (t) => _process(t, voice: true)),
+      ),
+    ));
+  }
+
   void _toast(String m) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(m), duration: const Duration(seconds: 3)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), duration: const Duration(seconds: 3)));
   }
 
   Future<void> _logout() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('تسجيل الخروج؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('خروج')),
-        ],
-      ),
-    );
-    if (ok == true) {
-      _beat?.cancel();
-      await sb.auth.signOut();
-    }
-  }
-
-  Future<void> _toggleTheme(bool dark) async {
-    themeMode.value = dark ? ThemeMode.dark : ThemeMode.light;
-    await KvStore.instance.set('aiTheme', dark ? 'dark' : 'light');
-  }
-
-  void _scrollDown() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.animateTo(
-          _scroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    _beat?.cancel();
+    try {
+      await sb.from('profiles').update({'in_call': false, 'voice_active': false}).eq('id', uid);
+    } catch (_) {}
+    await sb.auth.signOut();
   }
 
   // ---------------- الواجهة ----------------
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final fg = dark ? const Color(0xFFF4F4F4) : Colors.black;
-    final bar = dark ? const Color(0xFF303030) : const Color(0xFFEFEFF0);
-
+    final pal = Pal.of(context);
     return Scaffold(
-      drawer: _drawer(dark, fg),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        title: Text('ChatGPT',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 19, color: fg)),
-        actions: [
-          IconButton(
-            tooltip: 'محادثة جديدة',
-            icon: Icon(Icons.edit_outlined, color: fg),
-            onPressed: _startNew,
+      key: _scaffold,
+      backgroundColor: pal.bg,
+      drawer: _sidebar(pal),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _header(pal),
+            Expanded(child: _body(pal)),
+            _bottom(pal),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _header(Pal pal) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+      child: Row(
+        children: [
+          CircleBtn(
+            color: pal.circle,
+            onTap: () => _scaffold.currentState?.openDrawer(),
+            child: CustomPaint(size: const Size(24, 24), painter: LinesPainter(pal.fg)),
+          ),
+          const Spacer(),
+          if (_temp)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text('محادثة مؤقتة', style: TextStyle(color: pal.mut, fontSize: 15)),
+            ),
+          const Spacer(),
+          CircleBtn(
+            color: _temp ? pal.fg : pal.circle,
+            onTap: () => _startNew(temp: !_temp),
+            child: CustomPaint(size: const Size(24, 24), painter: TempChatPainter(_temp ? pal.bg : pal.fg)),
           ),
         ],
       ),
-      body: SafeArea(
-        top: false,
+    );
+  }
+
+  Widget _body(Pal pal) {
+    if (_temp) return _list(pal, _tempMsgs);
+    return StreamBuilder<Rows>(
+      stream: _msgStream,
+      builder: (c, snap) {
+        if (snap.hasData) {
+          _msgs = snap.data!;
+          if (_msgs.isNotEmpty) _scrollEnd();
+        }
+        return _list(pal, _msgs);
+      },
+    );
+  }
+
+  Widget _list(Pal pal, Rows rows) {
+    if (rows.isEmpty && _waiting == 0) return _welcomeView(pal);
+    return ListView.builder(
+      controller: _scroll,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      itemCount: rows.length + (_waiting > 0 ? 1 : 0),
+      itemBuilder: (c, i) {
+        if (i >= rows.length) {
+          return Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(color: pal.fg, shape: BoxShape.circle),
+              ),
+            ),
+          );
+        }
+        final m = rows[i];
+        final mine = m['sender'] == 'user';
+        final text = (m['text'] ?? '').toString();
+        return mine ? _userBubble(pal, text) : _botText(pal, text);
+      },
+    );
+  }
+
+  Widget _userBubble(Pal pal, String text) {
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: GestureDetector(
+        onLongPress: () => _copy(text),
+        child: Container(
+          margin: const EdgeInsets.only(top: 8, bottom: 8, left: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: BoxDecoration(color: pal.bub, borderRadius: BorderRadius.circular(22)),
+          child: SelectableText(text, style: TextStyle(color: pal.bubt, fontSize: 17, height: 1.5)),
+        ),
+      ),
+    );
+  }
+
+  void _copy(String t) {
+    Clipboard.setData(ClipboardData(text: t));
+    _toast('تم النسخ');
+  }
+
+  Widget _botText(Pal pal, String text) {
+    final parts = <Widget>[];
+    final re = RegExp(r'```([^\n`]*)\n?([\s\S]*?)```');
+    var last = 0;
+    void plain(String s) {
+      s = s.trim();
+      if (s.isEmpty) return;
+      parts.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: SelectableText(s, style: TextStyle(color: pal.fg, fontSize: 17, height: 1.6)),
+      ));
+    }
+
+    for (final m in re.allMatches(text)) {
+      plain(text.substring(last, m.start));
+      final lang = (m.group(1) ?? '').trim();
+      final body = (m.group(2) ?? '').trimRight();
+      final writing = lang == 'writing';
+      parts.add(Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(color: pal.code, borderRadius: BorderRadius.circular(14), border: Border.all(color: pal.line)),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: StreamBuilder<Rows>(
-                stream: _msgStream,
-                builder: (context, snap) {
-                  final data = snap.data;
-                  if (data != null) _msgs = data;
-                  if (_msgs.isEmpty && _waiting == 0) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(_welcome,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600, color: fg)),
-                      ),
-                    );
-                  }
-                  _scrollDown();
-                  final extra = _waiting > 0 ? 1 : 0;
-                  return ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-                    itemCount: _msgs.length + extra,
-                    itemBuilder: (context, i) {
-                      if (i >= _msgs.length) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: Text('●●●',
-                                style: TextStyle(color: fg.withAlpha(120), fontSize: 14)),
-                          ),
-                        );
-                      }
-                      return _bubble(_msgs[i], dark, fg);
-                    },
-                  );
-                },
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 6, 0),
+              child: Row(
+                children: [
+                  Text(writing ? 'نص' : (lang.isEmpty ? 'code' : lang), style: TextStyle(color: pal.mut, fontSize: 13)),
+                  const Spacer(),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _copy(body),
+                    icon: Icon(Icons.copy_rounded, size: 18, color: pal.mut),
+                  ),
+                ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-              child: Container(
-                decoration: BoxDecoration(color: bar, borderRadius: BorderRadius.circular(28)),
-                padding: const EdgeInsetsDirectional.only(start: 18, end: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _input,
-                        minLines: 1,
-                        maxLines: 5,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _send(),
-                        decoration: const InputDecoration(
-                          hintText: 'اسأل ChatGPT',
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: false,
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+              child: writing
+                  ? SelectableText(body, style: TextStyle(color: pal.fg, fontSize: 16, height: 1.6))
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SelectableText(
+                        body,
+                        textDirection: TextDirection.ltr,
+                        style: TextStyle(color: pal.fg, fontSize: 14, fontFamily: 'monospace', height: 1.45),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ));
+      last = m.end;
+    }
+    plain(text.substring(last));
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: parts),
+    );
+  }
+
+  Widget _welcomeView(Pal pal) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_title.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 22),
+                child: Text(_title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: pal.fg, fontSize: 30, fontWeight: FontWeight.w600)),
+              ),
+            if (!_temp)
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final x in _chips)
+                    GestureDetector(
+                      onTap: () => _send(text: x['text'], preset: x['answer']),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(color: pal.bar, borderRadius: BorderRadius.circular(24)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if ((x['emoji'] ?? '').isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(end: 8),
+                                child: Text(x['emoji']!, style: const TextStyle(fontSize: 20)),
+                              ),
+                            Text(x['text'] ?? '', style: TextStyle(color: pal.fg, fontSize: 16)),
+                          ],
                         ),
                       ),
                     ),
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: dark ? Colors.white : Colors.black,
-                        foregroundColor: dark ? Colors.black : Colors.white,
-                      ),
-                      icon: const Icon(Icons.arrow_upward),
-                      onPressed: _send,
-                    ),
-                  ],
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bottom(Pal pal) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(color: pal.bar, borderRadius: BorderRadius.circular(30)),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: _hasText ? () => _send() : _openVoice,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(color: Pal.blue, shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: _hasText
+                    ? const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 26)
+                    : CustomPaint(size: const Size(26, 26), painter: WavePainter(Colors.white)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _input,
+                style: TextStyle(color: pal.fg, fontSize: 17),
+                cursorColor: pal.fg,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+                decoration: InputDecoration(
+                  hintText: 'اسأل ChatGPT',
+                  hintStyle: TextStyle(color: pal.mut, fontSize: 17),
+                  border: InputBorder.none,
+                  isCollapsed: true,
                 ),
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _plusSheet(pal),
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Icon(Icons.add_rounded, color: pal.fg, size: 30),
               ),
             ),
           ],
@@ -457,107 +519,109 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _bubble(Map<String, dynamic> m, bool dark, Color fg) {
-    final sender = (m['sender'] ?? '').toString();
-    final text = (m['text'] ?? '').toString();
-    final att = m['att'];
-    final widgets = <Widget>[];
-
-    if (att is Map && att['type'] == 'image' && att['data'] is String) {
-      try {
-        final s = att['data'] as String;
-        final bytes = base64Decode(s.contains(',') ? s.split(',').last : s);
-        widgets.add(ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Image.memory(bytes, width: 220, fit: BoxFit.cover),
-        ));
-        widgets.add(const SizedBox(height: 6));
-      } catch (_) {}
-    }
-
-    if (sender == 'user') {
-      if (text.isNotEmpty) widgets.add(SelectableText(text,
-          style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
-              color: dark ? const Color(0xFF8EC5FF) : const Color(0xFF1173D4))));
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-            decoration: BoxDecoration(
-              color: dark ? const Color(0xFF1B3A5F) : const Color(0xFFE8F3FF),
-              borderRadius: BorderRadius.circular(20),
+  void _plusSheet(Pal pal) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: pal.sheet,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                for (final it in const [
+                  (Icons.photo_camera_outlined, 'الكاميرا'),
+                  (Icons.image_outlined, 'الصور'),
+                  (Icons.attach_file_rounded, 'الملفات'),
+                ])
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(c);
+                      _toast('${it.$2}: قريباً في التحديث القادم');
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 62,
+                          height: 62,
+                          decoration: BoxDecoration(color: pal.sheetIcon, shape: BoxShape.circle),
+                          child: Icon(it.$1, color: pal.fg, size: 28),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(it.$2, style: TextStyle(color: pal.fg, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets),
           ),
         ),
-      );
-    }
-
-    if (sender == 'admin') {
-      widgets.insert(
-          0,
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text('المشرف',
-                style: TextStyle(fontSize: 12, color: fg.withAlpha(130), fontWeight: FontWeight.w600)),
-          ));
-    }
-    if (text.isNotEmpty) widgets.add(SelectableText(text,
-        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500, height: 1.55, color: fg)));
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets),
+      ),
     );
   }
 
-  Widget _drawer(bool dark, Color fg) {
+  // ---------------- الشريط الجانبي ----------------
+  Widget _sidebar(Pal pal) {
+    const nav = [
+      (Icons.image_outlined, 'الصور'),
+      (Icons.view_sidebar_outlined, 'المكتبة'),
+      (Icons.folder_outlined, 'المشروعات'),
+      (Icons.schedule_rounded, 'مجدولة'),
+      (Icons.grid_view_rounded, 'استكشاف'),
+    ];
     return Drawer(
-      backgroundColor: dark ? const Color(0xFF171717) : const Color(0xFFFAFAFA),
+      backgroundColor: pal.side,
+      width: MediaQuery.of(context).size.width * 0.84,
+      shape: const RoundedRectangleBorder(),
       child: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person)),
-              title: Text(_name, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+              child: Text('ChatGPT', style: TextStyle(color: pal.fg, fontSize: 22, fontWeight: FontWeight.w700)),
             ),
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('محادثة جديدة'),
-              onTap: () {
-                Navigator.pop(context);
-                _startNew();
-              },
+            for (final n in nav)
+              ListTile(
+                dense: true,
+                leading: Icon(n.$1, color: pal.fg, size: 24),
+                title: Text(n.$2, style: TextStyle(color: pal.fg, fontSize: 17)),
+                onTap: () => _toast('${n.$2}: غير متاح حالياً'),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+              child: Text('المحادثات الأخيرة', style: TextStyle(color: pal.mut, fontSize: 14)),
             ),
-            const Divider(height: 1),
             Expanded(
               child: StreamBuilder<Rows>(
                 stream: _convStream,
-                builder: (context, snap) {
-                  final list = snap.data ?? <Map<String, dynamic>>[];
-                  if (list.isEmpty) {
-                    return Center(
-                      child: Text('لا توجد محادثات بعد',
-                          style: TextStyle(color: fg.withAlpha(130))),
-                    );
-                  }
+                builder: (c, snap) {
+                  final rows = snap.data ?? [];
                   return ListView.builder(
-                    itemCount: list.length,
-                    itemBuilder: (context, i) {
-                      final c = list[i];
-                      final id = (c['id'] ?? '').toString();
-                      final title = (c['title'] ?? 'محادثة جديدة').toString();
+                    itemCount: rows.length,
+                    itemBuilder: (c, i) {
+                      final r = rows[i];
+                      final id = r['id'].toString();
                       return ListTile(
-                        selected: id == _convId,
-                        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        dense: true,
+                        selected: id == _convId && !_temp,
+                        selectedTileColor: pal.bar,
+                        title: Text((r['title'] ?? 'محادثة').toString(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: pal.fg, fontSize: 16)),
                         onTap: () {
                           Navigator.pop(context);
                           _open(id);
+                        },
+                        onLongPress: () async {
+                          await sb.from('conversations').delete().eq('id', id);
+                          await sb.from('messages').delete().eq('conv_id', id);
+                          if (id == _convId) _startNew();
                         },
                       );
                     },
@@ -565,19 +629,88 @@ class _ChatScreenState extends State<ChatScreen> {
                 },
               ),
             ),
-            const Divider(height: 1),
-            SwitchListTile(
-              secondary: const Icon(Icons.dark_mode_outlined),
-              title: const Text('الوضع الداكن'),
-              value: dark,
-              onChanged: _toggleTheme,
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('تسجيل الخروج'),
-              onTap: _logout,
+            Divider(color: pal.line, height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => _settings(pal),
+                    child: CircleAvatar(
+                      radius: 22,
+                      backgroundColor: pal.bar,
+                      child: Text(_name.isEmpty ? '?' : _name.characters.first,
+                          style: TextStyle(color: pal.fg, fontSize: 18, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _startNew();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      decoration: BoxDecoration(color: pal.fg, borderRadius: BorderRadius.circular(26)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_square, color: pal.bg, size: 20),
+                          const SizedBox(width: 8),
+                          Text('الدردشة', style: TextStyle(color: pal.bg, fontSize: 16, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _settings(Pal pal) {
+    showDialog(
+      context: context,
+      builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: StatefulBuilder(
+          builder: (c, set) => AlertDialog(
+            backgroundColor: pal.sheet,
+            title: Text('الإعدادات', style: TextStyle(color: pal.fg)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(_name, style: TextStyle(color: pal.fg, fontSize: 18)),
+                  subtitle: Text(sb.auth.currentUser?.email ?? '', style: TextStyle(color: pal.mut)),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('الوضع الداكن', style: TextStyle(color: pal.fg)),
+                  value: themeMode.value == ThemeMode.dark,
+                  onChanged: (v) {
+                    themeMode.value = v ? ThemeMode.dark : ThemeMode.light;
+                    KvStore.instance.set('aiTheme', v ? 'dark' : 'light');
+                    Navigator.pop(c);
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(c);
+                  _logout();
+                },
+                child: const Text('تسجيل الخروج', style: TextStyle(color: Colors.redAccent)),
+              ),
+              TextButton(onPressed: () => Navigator.pop(c), child: const Text('إغلاق')),
+            ],
+          ),
         ),
       ),
     );
