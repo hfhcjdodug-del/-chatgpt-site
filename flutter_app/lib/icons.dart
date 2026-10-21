@@ -195,3 +195,64 @@ class BikeCardPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant BikeCardPainter old) => false;
 }
+
+/// أيقونة PNG بيضاء قابلة للتلوين (مقصوصة من تصميم التطبيق)
+class Ic extends StatelessWidget {
+  const Ic(this.name, {super.key, required this.size, required this.color});
+  final String name;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+        'assets/icons/$name.png',
+        width: size,
+        height: size,
+        color: color,
+        filterQuality: FilterQuality.high,
+      );
+}
+
+/// ثلاث نقاط عمودية ⋮
+class Dots3 extends StatelessWidget {
+  const Dots3({super.key, this.color = Colors.white});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var k = 0; k < 3; k++)
+            Container(
+              width: 5,
+              height: 5,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+        ],
+      );
+}
+
+/// نجمة رباعية (✦) في زر Plus
+class SparklePainter extends CustomPainter {
+  SparklePainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final k = s.width / 24;
+    Offset o(double x, double y) => Offset(x * k, y * k);
+    final p = Path()
+      ..moveTo(12 * k, 1.5 * k)
+      ..cubicTo(12.9 * k, 7.6 * k, 16.4 * k, 11.1 * k, 22.5 * k, 12 * k)
+      ..cubicTo(16.4 * k, 12.9 * k, 12.9 * k, 16.4 * k, 12 * k, 22.5 * k)
+      ..cubicTo(11.1 * k, 16.4 * k, 7.6 * k, 12.9 * k, 1.5 * k, 12 * k)
+      ..cubicTo(7.6 * k, 11.1 * k, 11.1 * k, 7.6 * k, 12 * k, 1.5 * k)
+      ..close();
+    canvas.drawPath(p, Paint()..color = color);
+    o(0, 0);
+  }
+
+  @override
+  bool shouldRepaint(covariant SparklePainter old) => old.color != color;
+}

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -25,6 +26,7 @@ class _ChatScreenState extends State<ChatScreen> {
   late final String uid;
   final GlobalKey<ScaffoldState> _scaffold = GlobalKey<ScaffoldState>();
   final TextEditingController _input = TextEditingController();
+  final FocusNode _focus = FocusNode();
   final ScrollController _scroll = ScrollController();
 
   String? _convId;
@@ -43,6 +45,10 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Map<String, String>> _chips = const [];
   bool _hasText = false;
   bool _temp = false;
+  bool _plusOpen = false;
+  bool _cancelGen = false;
+  final AudioPlayer _player = AudioPlayer();
+  final Map<String, int> _fb = {};
 
   @override
   void initState() {
@@ -56,7 +62,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _startNew();
     _input.addListener(() {
       final h = _input.text.trim().isNotEmpty;
-      if (h != _hasText) setState(() => _hasText = h);
+      if (h != _hasText) setState(() {
+        _hasText = h;
+        if (h) _plusOpen = false;
+      });
     });
     _init();
   }
@@ -65,6 +74,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _beat?.cancel();
     _input.dispose();
+    _player.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -159,6 +169,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<String> _process(String text, {bool voice = false, String? preset}) async {
     final cid = _convId!;
     final now = DateTime.now().millisecondsSinceEpoch;
+    _cancelGen = false;
     if (_temp) {
       final hist = List<Map<String, dynamic>>.from(_tempMsgs);
       setState(() {
@@ -168,11 +179,15 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollEnd();
       try {
         final ans = preset ?? await Svc.matchReply(text) ?? await Svc.askAi(hist, text, voice: voice) ?? 'تمام 👍';
+        if (_cancelGen) {
+          _cancelGen = false;
+          return '';
+        }
         if (mounted) setState(() => _tempMsgs.add({'sender': 'bot', 'text': ans}));
         _scrollEnd();
         return ans;
       } finally {
-        if (mounted) setState(() => _waiting--);
+        if (mounted) setState(() => _waiting = _waiting > 0 ? _waiting - 1 : 0);
       }
     }
     if (_convIsNew) {
@@ -199,13 +214,17 @@ class _ChatScreenState extends State<ChatScreen> {
       final human = p != null && (p['in_call'] == true || hu > DateTime.now().millisecondsSinceEpoch);
       if (human) return '';
       if (aiF != null) ans = await aiF;
+      if (_cancelGen) {
+        _cancelGen = false;
+        return '';
+      }
       if (ans == null) {
         ans = 'تعذّر الاتصال بالذكاء الاصطناعي${Svc.lastError.isEmpty ? '' : ' (${Svc.lastError})'}';
       }
       await sb.from('messages').insert({'user_id': uid, 'conv_id': cid, 'sender': 'bot', 'text': ans});
       return ans;
     } finally {
-      if (mounted) setState(() => _waiting--);
+      if (mounted) setState(() => _waiting = _waiting > 0 ? _waiting - 1 : 0);
     }
   }
 
@@ -273,43 +292,71 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  bool get _hasMsgs => (_temp ? _tempMsgs.isNotEmpty : _msgs.isNotEmpty) || _waiting > 0;
+
   Widget _header(Pal pal) {
+    final started = _hasMsgs;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
       child: Row(
         textDirection: TextDirection.ltr,
         children: [
-          CircleBtn(
-            color: _temp ? pal.fg : pal.circle,
-            onTap: () => _startNew(temp: !_temp),
-            child: CustomPaint(size: const Size(24, 24), painter: TempChatPainter(_temp ? pal.bg : pal.fg)),
-          ),
-          const Spacer(),
-          if (_temp)
-            Text('محادثة مؤقتة', style: TextStyle(color: pal.mut, fontSize: 15))
+          if (started)
+            Container(
+              height: 46,
+              width: 142,
+              decoration: BoxDecoration(color: pal.circle, borderRadius: BorderRadius.circular(24)),
+              child: Row(
+                textDirection: TextDirection.ltr,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _toast('قريباً'),
+                    child: const SizedBox(width: 44, height: 46, child: Center(child: Dots3())),
+                  ),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _startNew(temp: _temp),
+                    child: SizedBox(width: 44, height: 46, child: Center(child: Ic('edit', size: 26, color: pal.fg))),
+                  ),
+                ],
+              ),
+            )
           else
+            CircleBtn(
+              color: _temp ? pal.fg : pal.circle,
+              onTap: () => _startNew(temp: !_temp),
+              child: Ic('temp', size: 28, color: _temp ? pal.bg : pal.fg),
+            ),
+          const Spacer(),
+          if (!started && !_temp)
             GestureDetector(
               onTap: () => _plusModal(pal),
               child: Container(
                 height: 46,
                 padding: const EdgeInsets.symmetric(horizontal: 18),
-                decoration: BoxDecoration(color: pal.pill, borderRadius: BorderRadius.circular(24)),
+                decoration: BoxDecoration(
+                  color: pal.pill,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: pal.line.withAlpha(120)),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('اشترك في Plus',
                         style: TextStyle(color: pal.pillt, fontSize: 17, fontWeight: FontWeight.w700)),
                     const SizedBox(width: 8),
-                    Icon(Icons.auto_awesome, color: pal.pillt, size: 20),
+                    CustomPaint(size: const Size(20, 20), painter: SparklePainter(pal.pillt)),
                   ],
                 ),
               ),
             ),
-          const SizedBox(width: 10),
+          if (!started && !_temp) const SizedBox(width: 10),
           CircleBtn(
             color: pal.circle,
             onTap: () => _scaffold.currentState?.openDrawer(),
-            child: CustomPaint(size: const Size(24, 24), painter: LinesPainter(pal.fg)),
+            child: Ic('menu', size: 28, color: pal.fg),
           ),
         ],
       ),
@@ -390,11 +437,11 @@ class _ChatScreenState extends State<ChatScreen> {
           return Align(
             alignment: AlignmentDirectional.centerStart,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.fromLTRB(4, 14, 4, 14),
               child: Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(color: pal.fg, shape: BoxShape.circle),
+                width: 22,
+                height: 22,
+                decoration: const BoxDecoration(color: Color(0xFFB8C8FF), shape: BoxShape.circle),
               ),
             ),
           );
@@ -414,12 +461,37 @@ class _ChatScreenState extends State<ChatScreen> {
         onLongPress: () => _copy(text),
         child: Container(
           margin: const EdgeInsets.only(top: 8, bottom: 8, right: 56),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          decoration: BoxDecoration(color: pal.bub, borderRadius: BorderRadius.circular(22)),
-          child: SelectableText(text, textAlign: TextAlign.right, style: TextStyle(color: pal.bubt, fontSize: 17, fontWeight: FontWeight.w500, height: 1.4)),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+          decoration: BoxDecoration(color: pal.bub, borderRadius: BorderRadius.circular(30)),
+          child: SelectableText(text, textAlign: TextAlign.right, style: TextStyle(color: pal.bubt, fontSize: 18, fontWeight: FontWeight.w500, height: 1.4)),
         ),
       ),
     );
+  }
+
+  Future<void> _speakMsg(String text) async {
+    final clean = Svc.speakable(text);
+    if (clean.isEmpty) return;
+    try {
+      await _player.stop();
+      final v = voices[0];
+      final chunks = Svc.ttsSplit(clean);
+      final fs = chunks.map((x) => Svc.ttsFetch(x, v)).toList();
+      for (final f in fs) {
+        final bytes = await f;
+        if (bytes == null) {
+          _toast('فشل الصوت: ${Svc.ttsFail}');
+          return;
+        }
+        final done = Completer<void>();
+        final sub = _player.onPlayerComplete.listen((_) {
+          if (!done.isCompleted) done.complete();
+        });
+        await _player.play(BytesSource(bytes, mimeType: 'audio/mpeg'));
+        await done.future.timeout(const Duration(seconds: 40), onTimeout: () {});
+        await sub.cancel();
+      }
+    } catch (_) {}
   }
 
   void _copy(String t) {
@@ -489,21 +561,32 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         ...parts,
         const SizedBox(height: 8),
-        Row(
-          textDirection: TextDirection.ltr,
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            for (final ic in [Icons.volume_up_outlined, Icons.thumb_up_alt_outlined, Icons.thumb_down_alt_outlined, Icons.ios_share_rounded])
-              Padding(
-                padding: const EdgeInsets.only(left: 22),
-                child: GestureDetector(
-                  onTap: () => _copy(text),
-                  child: Icon(ic, size: 22, color: pal.mut),
+        Builder(builder: (ctx) {
+          final k = text;
+          final fb = _fb[k] ?? 0;
+          Widget btn(String n, VoidCallback f, {Color? col}) => GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: f,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 26),
+                  child: Ic(n, size: 24, color: col ?? pal.mut),
                 ),
+              );
+          return Row(
+            children: [
+              btn('copy', () => _copy(text)),
+              btn('like', () => setState(() => _fb[k] = fb == 1 ? 0 : 1), col: fb == 1 ? pal.fg : null),
+              btn('dislike', () => setState(() => _fb[k] = fb == 2 ? 0 : 2), col: fb == 2 ? pal.fg : null),
+              btn('speaker', () => _speakMsg(text)),
+              btn('share', () => _copy(text)),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _toast('قريباً'),
+                child: Padding(padding: const EdgeInsetsDirectional.only(end: 6), child: Dots3(color: pal.mut)),
               ),
-            const SizedBox(width: 0),
-          ],
-        ),
+            ],
+          );
+        }),
       ]),
     );
   }
@@ -595,123 +678,113 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _bottom(Pal pal) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
-      child: Container(
-        height: 56,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        decoration: BoxDecoration(color: pal.bar, borderRadius: BorderRadius.circular(30)),
-        child: Row(
-          textDirection: TextDirection.ltr,
-          children: [
-            GestureDetector(
-              onTap: _hasText ? () => _send() : _openVoice,
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(color: Pal.blue, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: _hasText
-                    ? const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 26)
-                    : CustomPaint(size: const Size(26, 26), painter: WavePainter(Colors.white)),
-              ),
-            ),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _dictate,
-              child: SizedBox(
-                width: 46,
-                height: 44,
-                child: Icon(_dictating ? Icons.mic : Icons.mic_none_rounded,
-                    color: _dictating ? Pal.blue : pal.fg, size: 28),
-              ),
-            ),
-            Expanded(
-              child: TextField(
-                controller: _input,
-                textDirection: TextDirection.rtl,
-                textAlign: TextAlign.right,
-                style: TextStyle(color: pal.fg, fontSize: 17, fontWeight: FontWeight.w600),
-                cursorColor: pal.fg,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                decoration: InputDecoration(
-                  hintText: 'اسأل ChatGPT',
-                  hintStyle: TextStyle(color: pal.mut, fontSize: 17),
-                  border: InputBorder.none,
-                  isCollapsed: true,
-                ),
-              ),
-            ),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _plusSheet(pal),
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: Icon(Icons.add_rounded, color: pal.fg, size: 30),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _plusSheet(Pal pal) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: pal.sheet,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (c) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: SafeArea(
+    final gen = _waiting > 0;
+    final hint = _hasMsgs ? 'الرد على ChatGPT' : 'اسأل ChatGPT';
+    Widget opt(String ic, String t) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            setState(() => _plusOpen = false);
+            if (ic == 'img') {
+              _toast('إنشاء الصور قريباً');
+            } else {
+              _focus.requestFocus();
+            }
+          },
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 26),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                for (final it in const [
-                  (Icons.photo_camera_outlined, 'الكاميرا'),
-                  (Icons.image_outlined, 'الصور'),
-                  (Icons.attach_file_rounded, 'الملفات'),
-                ])
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(c);
-                      _toast('${it.$2}: قريباً في التحديث القادم');
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 62,
-                          height: 62,
-                          decoration: BoxDecoration(color: pal.sheetIcon, shape: BoxShape.circle),
-                          child: Icon(it.$1, color: pal.fg, size: 28),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(it.$2, style: TextStyle(color: pal.fg, fontSize: 14)),
-                      ],
+                Ic(ic, size: 28, color: pal.fg),
+                const SizedBox(width: 16),
+                Text(t, style: TextStyle(color: pal.fg, fontSize: 18.5, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_plusOpen && !_hasText) ...[
+          opt('img', 'إنشاء صورة أو ملصق'),
+          opt('pencil', 'الكتابة أو التحرير'),
+          const SizedBox(height: 6),
+        ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+          child: Container(
+            height: 58,
+            padding: const EdgeInsets.symmetric(horizontal: 5),
+            decoration: BoxDecoration(color: pal.bar, borderRadius: BorderRadius.circular(30)),
+            child: Row(
+              textDirection: TextDirection.ltr,
+              children: [
+                GestureDetector(
+                  onTap: gen
+                      ? () => setState(() {
+                            _cancelGen = true;
+                            _waiting = 0;
+                          })
+                      : (_hasText ? () => _send() : _openVoice),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(color: Pal.blue, shape: BoxShape.circle),
+                    alignment: Alignment.center,
+                    child: Ic(gen ? 'stop' : (_hasText ? 'up' : 'wave'), size: gen ? 20 : 26, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _dictate,
+                  child: SizedBox(
+                    width: 30,
+                    height: 44,
+                    child: Center(child: Ic('mic', size: 28, color: _dictating ? Pal.blue : pal.fg)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    focusNode: _focus,
+                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(color: pal.fg, fontSize: 17, fontWeight: FontWeight.w600),
+                    cursorColor: pal.fg,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    decoration: InputDecoration(
+                      hintText: hint,
+                      hintStyle: TextStyle(color: pal.mut, fontSize: 17, fontWeight: FontWeight.w600),
+                      border: InputBorder.none,
+                      isCollapsed: true,
                     ),
                   ),
+                ),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _plusOpen = !_plusOpen),
+                  child: SizedBox(width: 46, height: 46, child: Center(child: Ic('plus', size: 30, color: pal.fg))),
+                ),
               ],
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
   // ---------------- الشريط الجانبي ----------------
   Widget _sidebar(Pal pal) {
     const nav = [
-      (Icons.collections_outlined, 'الصور'),
-      (Icons.view_week_outlined, 'المكتبة'),
-      (Icons.folder_open_rounded, 'المشروعات'),
-      (Icons.desktop_windows_outlined, 'التحكم عن بُعد'),
-      (Icons.schedule_rounded, 'المهام'),
-      (Icons.extension_outlined, 'المكونات الإضافية'),
+      ('nav_images', 'الصور'),
+      ('nav_library', 'المكتبة'),
+      ('nav_projects', 'المشروعات'),
+      ('nav_remote', 'التحكم عن بُعد'),
+      ('nav_tasks', 'المهام'),
+      ('nav_plugins', 'المكونات الإضافية'),
     ];
     final initials = _name.trim().isEmpty
         ? '?'
@@ -766,7 +839,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
                   child: Row(children: [
-                    Icon(n.$1, color: pal.fg, size: 26),
+                    Ic(n.$1, size: 28, color: pal.fg),
                     const SizedBox(width: 16),
                     Text(n.$2, style: TextStyle(color: pal.fg, fontSize: 17.5, fontWeight: FontWeight.w600)),
                   ]),
@@ -800,12 +873,23 @@ class _ChatScreenState extends State<ChatScreen> {
                           if (id == _convId) _startNew();
                         },
                         child: Container(
-                          color: (id == _convId && !_temp) ? pal.bar : null,
+                          color: null,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                          child: Text((r['title'] ?? 'محادثة').toString(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: pal.fg, fontSize: 17)),
+                          child: Row(children: [
+                            Expanded(
+                              child: Text((r['title'] ?? 'محادثة').toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: pal.fg, fontSize: 17)),
+                            ),
+                            if (id == _convId && !_temp)
+                              Container(
+                                width: 10,
+                                height: 10,
+                                margin: const EdgeInsetsDirectional.only(start: 8),
+                                decoration: const BoxDecoration(color: Pal.blue, shape: BoxShape.circle),
+                              ),
+                          ]),
                         ),
                       );
                     },
@@ -830,7 +914,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.edit_square, color: Colors.white, size: 24),
+                            const Ic('edit', size: 26, color: Colors.white),
                             const SizedBox(width: 10),
                             const Text('الدردشة',
                                 style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),

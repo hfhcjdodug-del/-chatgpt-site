@@ -17,8 +17,8 @@ class Pal {
   Color get circle => bar;
   Color get side => dark ? const Color(0xFF212121) : const Color(0xFFFAFAFA);
   Color get line => dark ? const Color(0xFF414141) : const Color(0xFFE7E7E9);
-  Color get bub => dark ? const Color(0xFF1B3A5F) : const Color(0xFFE8F3FF);
-  Color get bubt => dark ? const Color(0xFF8EC5FF) : const Color(0xFF1173D4);
+  Color get bub => dark ? const Color(0xFF0A1170) : const Color(0xFFE8F3FF);
+  Color get bubt => dark ? Colors.white : const Color(0xFF1173D4);
   Color get pill => dark ? const Color(0xFF33414F) : const Color(0xFFE6F2FF);
   Color get pillt => dark ? const Color(0xFF5CA8FF) : const Color(0xFF0A84FF);
   Color get sheet => dark ? const Color(0xFF2A2A2D) : const Color(0xFFF7F7F8);
