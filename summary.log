@@ -1,0 +1,9 @@
+anonymous sign-in status: 200
+settings docs: 6
+- ai {system: <str 1311 chars, starts 'أنت "مساعد 7AI"، مساعد'>, temp: 0.8, url: 'https://small-snow-a143.jadocool0427.workers.dev/', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', on: True}
+- btn_plus {scale: 0.9}
+- btn_voice {scale: 0.75}
+- fx {speed: 'normal', mode: 'slide_up'}
+- menu {write: True, image: True, voice: False}
+- notices {list: <list 292 chars>}
+replies docs: 54
