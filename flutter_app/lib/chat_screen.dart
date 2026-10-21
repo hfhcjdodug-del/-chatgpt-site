@@ -277,13 +277,14 @@ class _ChatScreenState extends State<ChatScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
       child: Row(
+        textDirection: TextDirection.ltr,
         children: [
           CircleBtn(
-            color: pal.circle,
-            onTap: () => _scaffold.currentState?.openDrawer(),
-            child: CustomPaint(size: const Size(24, 24), painter: LinesPainter(pal.fg)),
+            color: _temp ? pal.fg : pal.circle,
+            onTap: () => _startNew(temp: !_temp),
+            child: CustomPaint(size: const Size(24, 24), painter: TempChatPainter(_temp ? pal.bg : pal.fg)),
           ),
-          const SizedBox(width: 10),
+          const Spacer(),
           if (_temp)
             Text('محادثة مؤقتة', style: TextStyle(color: pal.mut, fontSize: 15))
           else
@@ -304,11 +305,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
-          const Spacer(),
+          const SizedBox(width: 10),
           CircleBtn(
-            color: _temp ? pal.fg : pal.circle,
-            onTap: () => _startNew(temp: !_temp),
-            child: CustomPaint(size: const Size(24, 24), painter: TempChatPainter(_temp ? pal.bg : pal.fg)),
+            color: pal.circle,
+            onTap: () => _scaffold.currentState?.openDrawer(),
+            child: CustomPaint(size: const Size(24, 24), painter: LinesPainter(pal.fg)),
           ),
         ],
       ),
@@ -408,14 +409,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _userBubble(Pal pal, String text) {
     return Align(
-      alignment: AlignmentDirectional.centerStart,
+      alignment: Alignment.centerLeft,
       child: GestureDetector(
         onLongPress: () => _copy(text),
         child: Container(
-          margin: const EdgeInsets.only(top: 8, bottom: 8, left: 56),
+          margin: const EdgeInsets.only(top: 8, bottom: 8, right: 56),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           decoration: BoxDecoration(color: pal.bub, borderRadius: BorderRadius.circular(22)),
-          child: SelectableText(text, style: TextStyle(color: pal.bubt, fontSize: 17, height: 1.5)),
+          child: SelectableText(text, textAlign: TextAlign.right, style: TextStyle(color: pal.bubt, fontSize: 17, fontWeight: FontWeight.w500, height: 1.4)),
         ),
       ),
     );
@@ -435,7 +436,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (s.isEmpty) return;
       parts.add(Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: SelectableText(s, style: TextStyle(color: pal.fg, fontSize: 17, height: 1.6)),
+        child: SelectableText(s, textAlign: TextAlign.right, style: TextStyle(color: pal.fg, fontSize: 17, fontWeight: FontWeight.w500, height: 1.6)),
       ));
     }
 
@@ -485,7 +486,25 @@ class _ChatScreenState extends State<ChatScreen> {
     plain(text.substring(last));
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 10),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: parts),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ...parts,
+        const SizedBox(height: 8),
+        Row(
+          textDirection: TextDirection.ltr,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            for (final ic in [Icons.volume_up_outlined, Icons.thumb_up_alt_outlined, Icons.thumb_down_alt_outlined, Icons.ios_share_rounded])
+              Padding(
+                padding: const EdgeInsets.only(left: 22),
+                child: GestureDetector(
+                  onTap: () => _copy(text),
+                  child: Icon(ic, size: 22, color: pal.mut),
+                ),
+              ),
+            const SizedBox(width: 0),
+          ],
+        ),
+      ]),
     );
   }
 
@@ -583,6 +602,7 @@ class _ChatScreenState extends State<ChatScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(color: pal.bar, borderRadius: BorderRadius.circular(30)),
         child: Row(
+          textDirection: TextDirection.ltr,
           children: [
             GestureDetector(
               onTap: _hasText ? () => _send() : _openVoice,
@@ -609,7 +629,9 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: TextField(
                 controller: _input,
-                style: TextStyle(color: pal.fg, fontSize: 17),
+                textDirection: TextDirection.rtl,
+                textAlign: TextAlign.right,
+                style: TextStyle(color: pal.fg, fontSize: 17, fontWeight: FontWeight.w600),
                 cursorColor: pal.fg,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _send(),
