@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config.dart';
-import 'default_suggestions.dart';
 
 typedef Rows = List<Map<String, dynamic>>;
 
@@ -54,8 +53,8 @@ class Svc {
 
   // ---------- اقتراحات الترحيب ----------
   static Future<({String title, List<Map<String, String>> items})> loadWelcome() async {
-    var title = 'أنا جاهز متى شئت.';
-    var items = defaultSuggestions;
+    var title = '';
+    var items = <Map<String, String>>[];
     try {
       final w = await sb.from('settings').select('data').eq('id', 'welcome').maybeSingle();
       final d = w?['data'];

@@ -141,3 +141,57 @@ class VoiceBall extends StatelessWidget {
     );
   }
 }
+
+/// بطاقة الدراجة في شاشة الترحيب (رسم مبسّط)
+class BikeCardPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.drawRect(Offset.zero & s, Paint()..color = const Color(0xFFEBD6D1));
+    final green = Paint()
+      ..color = const Color(0xFF2F4A3E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.5
+      ..strokeCap = StrokeCap.round;
+    final gray = Paint()
+      ..color = const Color(0xFF7A8A80)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+    final thin = Paint()
+      ..color = const Color(0xFF7A8A80)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final w = s.width, h = s.height;
+    final l = Offset(w * 0.25, h * 0.60), r = Offset(w * 0.80, h * 0.60);
+    final rad = w * 0.145;
+    for (final c in [l, r]) {
+      canvas.drawCircle(c, rad, gray);
+      canvas.drawCircle(c, 5, thin);
+      for (var k = 0; k < 12; k++) {
+        final a = k * math.pi / 6;
+        canvas.drawLine(c, c + Offset(math.cos(a), math.sin(a)) * rad, thin);
+      }
+    }
+    final crank = Offset(w * 0.47, h * 0.62);
+    final seat = Offset(w * 0.34, h * 0.27);
+    final head = Offset(w * 0.68, h * 0.30);
+    canvas.drawLine(l, seat, green);
+    canvas.drawLine(seat, head, green);
+    canvas.drawLine(l, crank, green);
+    canvas.drawLine(crank, seat, green);
+    canvas.drawLine(crank, head, green);
+    canvas.drawLine(head, r, green);
+    canvas.drawLine(seat - Offset(w * 0.05, h * 0.03), seat + Offset(w * 0.05, -h * 0.03), green);
+    canvas.drawLine(head, head + Offset(w * 0.05, -h * 0.07), green);
+    canvas.drawCircle(crank, 9, gray);
+    final tag = Paint()..color = const Color(0xFF2F4A3E);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(w * 0.47, h * 0.45), width: 14, height: 14), const Radius.circular(3)), tag);
+    // شريط التقدم
+    final y = h * 0.90;
+    canvas.drawLine(Offset(w * 0.06, y), Offset(w * 0.94, y), Paint()..color = const Color(0xFFE3C2BC)..strokeWidth = 5..strokeCap = StrokeCap.round);
+    canvas.drawLine(Offset(w * 0.06, y), Offset(w * 0.46, y), Paint()..color = const Color(0xFF8A8A8A)..strokeWidth = 5..strokeCap = StrokeCap.round);
+    canvas.drawCircle(Offset(w * 0.46, y), 6, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant BikeCardPainter old) => false;
+}

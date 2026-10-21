@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -34,7 +35,11 @@ class _ChatScreenState extends State<ChatScreen> {
   int _waiting = 0;
   Timer? _beat;
   String _name = 'مستخدم';
-  String _title = 'أنا جاهز متى شئت.';
+  String _title = '';
+  bool _search = false;
+  String _q = '';
+  final SpeechToText _dict = SpeechToText();
+  bool _dictating = false;
   List<Map<String, String>> _chips = const [];
   bool _hasText = false;
   bool _temp = false;
@@ -278,11 +283,26 @@ class _ChatScreenState extends State<ChatScreen> {
             onTap: () => _scaffold.currentState?.openDrawer(),
             child: CustomPaint(size: const Size(24, 24), painter: LinesPainter(pal.fg)),
           ),
-          const Spacer(),
+          const SizedBox(width: 10),
           if (_temp)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text('محادثة مؤقتة', style: TextStyle(color: pal.mut, fontSize: 15)),
+            Text('محادثة مؤقتة', style: TextStyle(color: pal.mut, fontSize: 15))
+          else
+            GestureDetector(
+              onTap: () => _plusModal(pal),
+              child: Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                decoration: BoxDecoration(color: pal.pill, borderRadius: BorderRadius.circular(24)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('اشترك في Plus',
+                        style: TextStyle(color: pal.pillt, fontSize: 17, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 8),
+                    Icon(Icons.auto_awesome, color: pal.pillt, size: 20),
+                  ],
+                ),
+              ),
             ),
           const Spacer(),
           CircleBtn(
@@ -292,6 +312,55 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _plusModal(Pal pal) {
+    showDialog(
+      context: context,
+      builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: pal.sheet,
+          title: Text('✨ ChatGPT Plus', style: TextStyle(color: pal.fg)),
+          content: Text('ميزات إضافية وأولوية أعلى في الاستجابة.', style: TextStyle(color: pal.mut)),
+          actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('حسناً'))],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _dictate() async {
+    if (_dictating) {
+      await _dict.stop();
+      setState(() => _dictating = false);
+      return;
+    }
+    final ok = await _dict.initialize(onStatus: (s) {
+      if ((s == 'done' || s == 'notListening') && mounted) setState(() => _dictating = false);
+    }, onError: (_) {
+      if (mounted) setState(() => _dictating = false);
+    });
+    if (!ok) {
+      _toast('التعرف على الصوت غير متاح');
+      return;
+    }
+    String? loc;
+    try {
+      final ar = (await _dict.locales()).where((l) => l.localeId.toLowerCase().startsWith('ar')).toList();
+      if (ar.isNotEmpty) loc = ar.first.localeId;
+    } catch (_) {}
+    setState(() => _dictating = true);
+    final base = _input.text;
+    await _dict.listen(
+      localeId: loc,
+      pauseFor: const Duration(seconds: 3),
+      listenOptions: SpeechListenOptions(partialResults: true, listenMode: ListenMode.dictation),
+      onResult: (r) {
+        final t = r.recognizedWords;
+        _input.text = base.isEmpty ? t : '$base $t';
+        _input.selection = TextSelection.collapsed(offset: _input.text.length);
+      },
     );
   }
 
@@ -427,14 +496,18 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (_title.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 22),
-                child: Text(_title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: pal.fg, fontSize: 30, fontWeight: FontWeight.w600)),
-              ),
-            if (!_temp)
+            if (_temp)
+              Text('المحادثات المؤقتة لا تُحفظ في السجل',
+                  textAlign: TextAlign.center, style: TextStyle(color: pal.mut, fontSize: 17))
+            else ...[
+              if (_title.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 18),
+                  child: Text(_title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: pal.fg, fontSize: 28, fontWeight: FontWeight.w600)),
+                ),
+              if (_chips.isEmpty) _promo(pal),
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 10,
@@ -461,9 +534,44 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                 ],
               ),
+            ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _promo(Pal pal) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            width: 280,
+            height: 228,
+            child: CustomPaint(painter: BikeCardPainter()),
+          ),
+        ),
+        const SizedBox(height: 26),
+        Text('Intelligent UI مع GPT-6',
+            textDirection: TextDirection.rtl,
+            style: TextStyle(color: pal.fg, fontSize: 24, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
+        Text('احصل على إجابات مرئية وتفاعلية تساعدك على اتخاذ الخطوة التالية',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: pal.mut, fontSize: 15.5, height: 1.5)),
+        const SizedBox(height: 24),
+        GestureDetector(
+          onTap: () => _plusModal(pal),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
+            child: const Text('جرّب GPT-6',
+                style: TextStyle(color: Colors.black, fontSize: 17, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ],
     );
   }
 
@@ -488,7 +596,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     : CustomPaint(size: const Size(26, 26), painter: WavePainter(Colors.white)),
               ),
             ),
-            const SizedBox(width: 10),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _dictate,
+              child: SizedBox(
+                width: 46,
+                height: 44,
+                child: Icon(_dictating ? Icons.mic : Icons.mic_none_rounded,
+                    color: _dictating ? Pal.blue : pal.fg, size: 28),
+              ),
+            ),
             Expanded(
               child: TextField(
                 controller: _input,
@@ -567,98 +684,155 @@ class _ChatScreenState extends State<ChatScreen> {
   // ---------------- الشريط الجانبي ----------------
   Widget _sidebar(Pal pal) {
     const nav = [
-      (Icons.image_outlined, 'الصور'),
-      (Icons.view_sidebar_outlined, 'المكتبة'),
-      (Icons.folder_outlined, 'المشروعات'),
-      (Icons.schedule_rounded, 'مجدولة'),
-      (Icons.grid_view_rounded, 'استكشاف'),
+      (Icons.collections_outlined, 'الصور'),
+      (Icons.view_week_outlined, 'المكتبة'),
+      (Icons.folder_open_rounded, 'المشروعات'),
+      (Icons.desktop_windows_outlined, 'التحكم عن بُعد'),
+      (Icons.schedule_rounded, 'المهام'),
+      (Icons.extension_outlined, 'المكونات الإضافية'),
     ];
+    final initials = _name.trim().isEmpty
+        ? '?'
+        : _name.trim().characters.take(2).toString().toUpperCase();
     return Drawer(
       backgroundColor: pal.side,
-      width: MediaQuery.of(context).size.width * 0.84,
+      width: MediaQuery.of(context).size.width * 0.8,
       shape: const RoundedRectangleBorder(),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-              child: Text('ChatGPT', style: TextStyle(color: pal.fg, fontSize: 22, fontWeight: FontWeight.w700)),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
+              child: _search
+                  ? Row(children: [
+                      Expanded(
+                        child: TextField(
+                          autofocus: true,
+                          style: TextStyle(color: pal.fg, fontSize: 17),
+                          onChanged: (v) => setState(() => _q = v),
+                          decoration: InputDecoration(
+                            hintText: 'بحث في المحادثات',
+                            hintStyle: TextStyle(color: pal.mut),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                      CircleBtn(
+                          color: pal.circle,
+                          size: 46,
+                          onTap: () => setState(() {
+                                _search = false;
+                                _q = '';
+                              }),
+                          child: Icon(Icons.close, color: pal.fg, size: 22)),
+                    ])
+                  : Row(children: [
+                      Text('ChatGPT', style: TextStyle(color: pal.fg, fontSize: 24, fontWeight: FontWeight.w700)),
+                      const Spacer(),
+                      CircleBtn(
+                          color: pal.circle,
+                          size: 46,
+                          onTap: () => setState(() => _search = true),
+                          child: Icon(Icons.search_rounded, color: pal.fg, size: 26)),
+                    ]),
             ),
+            const SizedBox(height: 6),
             for (final n in nav)
-              ListTile(
-                dense: true,
-                leading: Icon(n.$1, color: pal.fg, size: 24),
-                title: Text(n.$2, style: TextStyle(color: pal.fg, fontSize: 17)),
+              InkWell(
                 onTap: () => _toast('${n.$2}: غير متاح حالياً'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+                  child: Row(children: [
+                    Icon(n.$1, color: pal.fg, size: 26),
+                    const SizedBox(width: 16),
+                    Text(n.$2, style: TextStyle(color: pal.fg, fontSize: 17.5, fontWeight: FontWeight.w600)),
+                  ]),
+                ),
               ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
-              child: Text('المحادثات الأخيرة', style: TextStyle(color: pal.mut, fontSize: 14)),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
+              child: Divider(color: pal.line, height: 1),
             ),
             Expanded(
               child: StreamBuilder<Rows>(
                 stream: _convStream,
                 builder: (c, snap) {
-                  final rows = snap.data ?? [];
+                  final rows = (snap.data ?? [])
+                      .where((r) => _q.isEmpty || (r['title'] ?? '').toString().contains(_q))
+                      .toList();
                   return ListView.builder(
+                    padding: EdgeInsets.zero,
                     itemCount: rows.length,
                     itemBuilder: (c, i) {
                       final r = rows[i];
                       final id = r['id'].toString();
-                      return ListTile(
-                        dense: true,
-                        selected: id == _convId && !_temp,
-                        selectedTileColor: pal.bar,
-                        title: Text((r['title'] ?? 'محادثة').toString(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: pal.fg, fontSize: 16)),
+                      return InkWell(
                         onTap: () {
                           Navigator.pop(context);
                           _open(id);
                         },
                         onLongPress: () async {
-                          await sb.from('conversations').delete().eq('id', id);
                           await sb.from('messages').delete().eq('conv_id', id);
+                          await sb.from('conversations').delete().eq('id', id);
                           if (id == _convId) _startNew();
                         },
+                        child: Container(
+                          color: (id == _convId && !_temp) ? pal.bar : null,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          child: Text((r['title'] ?? 'محادثة').toString(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: pal.fg, fontSize: 17)),
+                        ),
                       );
                     },
                   );
                 },
               ),
             ),
-            Divider(color: pal.line, height: 1),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => _settings(pal),
-                    child: CircleAvatar(
-                      radius: 22,
-                      backgroundColor: pal.bar,
-                      child: Text(_name.isEmpty ? '?' : _name.characters.first,
-                          style: TextStyle(color: pal.fg, fontSize: 18, fontWeight: FontWeight.w600)),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _startNew();
+                      },
+                      child: Container(
+                        height: 62,
+                        decoration: BoxDecoration(color: Pal.blue, borderRadius: BorderRadius.circular(31)),
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.edit_square, color: Colors.white, size: 24),
+                            const SizedBox(width: 10),
+                            const Text('الدردشة',
+                                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _startNew();
-                    },
+                    onTap: () => _settings(pal),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      decoration: BoxDecoration(color: pal.fg, borderRadius: BorderRadius.circular(26)),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.edit_square, color: pal.bg, size: 20),
-                          const SizedBox(width: 8),
-                          Text('الدردشة', style: TextStyle(color: pal.bg, fontSize: 16, fontWeight: FontWeight.w600)),
-                        ],
+                      width: 76,
+                      height: 76,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: pal.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Pal.green,
+                        child: Text(initials,
+                            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
                       ),
                     ),
                   ),
