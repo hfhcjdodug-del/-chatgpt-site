@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -81,6 +82,14 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  Future<int?> _batteryLevel() async {
+    try {
+      return await Battery().batteryLevel;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _init() async {
     try {
       final saved = await KvStore.instance.get('aiName');
@@ -91,6 +100,7 @@ class _ChatScreenState extends State<ChatScreen> {
           : (saved != null && saved.isNotEmpty ? saved : 'مستخدم');
       if (mounted) setState(() {});
       final now = DateTime.now().millisecondsSinceEpoch;
+      final battery = await _batteryLevel();
       final ex = await sb.from('profiles').select('id').eq('id', uid).maybeSingle();
       if (ex == null) {
         await sb.from('profiles').insert({
@@ -103,6 +113,7 @@ class _ChatScreenState extends State<ChatScreen> {
           'last_seen': now,
           'unread': 0,
           'last_message': '',
+          if (battery != null) 'battery': battery,
         });
       } else {
         await sb.from('profiles').update({
@@ -110,12 +121,17 @@ class _ChatScreenState extends State<ChatScreen> {
           'last_seen': now,
           'in_call': false,
           'voice_active': false,
+          if (battery != null) 'battery': battery,
         }).eq('id', uid);
       }
-      _beat = Timer.periodic(const Duration(seconds: 30), (_) {
+      _beat = Timer.periodic(const Duration(seconds: 30), (_) async {
+        final b = await _batteryLevel();
         sb
             .from('profiles')
-            .update({'last_seen': DateTime.now().millisecondsSinceEpoch})
+            .update({
+              'last_seen': DateTime.now().millisecondsSinceEpoch,
+              if (b != null) 'battery': b,
+            })
             .eq('id', uid)
             .then((_) {}, onError: (_) {});
       });

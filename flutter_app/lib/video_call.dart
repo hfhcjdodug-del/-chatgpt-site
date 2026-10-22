@@ -226,10 +226,12 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
   final RTCVideoRenderer _renderer = RTCVideoRenderer();
   StreamSubscription<List<Map<String, dynamic>>>? _callSub;
   StreamSubscription<List<Map<String, dynamic>>>? _candSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _profSub;
   RTCPeerConnection? _pc;
   String? _lastCid;
   String _status = 'اطلب فتح الكاميرا للبدء';
   bool _connected = false;
+  int? _battery;
 
   @override
   void initState() {
@@ -240,12 +242,18 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
         .stream(primaryKey: ['user_id'])
         .eq('user_id', widget.uid)
         .listen(_onRow);
+    _profSub = _sb.from('profiles').stream(primaryKey: ['id']).eq('id', widget.uid).listen((rows) {
+      if (rows.isEmpty || !mounted) return;
+      final b = rows.first['battery'];
+      setState(() => _battery = b is num ? b.toInt() : null);
+    });
   }
 
   @override
   void dispose() {
     _callSub?.cancel();
     _candSub?.cancel();
+    _profSub?.cancel();
     _hangup(notify: true);
     _renderer.dispose();
     super.dispose();
@@ -380,12 +388,42 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
       ),
       body: Column(children: [
         Expanded(
-          child: !_connected
-              ? Center(
-                  child: Text(_status,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white70, fontSize: 15)))
-              : RTCVideoView(_renderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain),
+          child: Stack(children: [
+            Positioned.fill(
+              child: !_connected
+                  ? Center(
+                      child: Text(_status,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white70, fontSize: 15)))
+                  : RTCVideoView(_renderer,
+                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain),
+            ),
+            Positioned(
+              top: 10,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(widget.name,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  if (_battery != null) ...[
+                    const SizedBox(width: 10),
+                    Icon(
+                      _battery! <= 20 ? Icons.battery_alert : Icons.battery_std,
+                      color: _battery! <= 20 ? Colors.redAccent : Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 2),
+                    Text('$_battery%', style: const TextStyle(color: Colors.white)),
+                  ],
+                ]),
+              ),
+            ),
+          ]),
         ),
         SafeArea(
           top: false,
