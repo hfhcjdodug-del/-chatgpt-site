@@ -21,6 +21,23 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _google() async {
+    setState(() {
+      _busy = true;
+      _err = '';
+    });
+    try {
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'com.mostafa.chatapp://login-callback',
+      );
+    } catch (e) {
+      if (mounted) setState(() => _err = 'تعذر الدخول عبر Google: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _login() async {
     final n = _name.text.trim();
     if (n.isEmpty) {
@@ -79,6 +96,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text('سجّل دخولك للبدء بالمحادثة',
                       style: TextStyle(fontSize: 15, color: fg.withAlpha(150))),
                   const SizedBox(height: 26),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: _busy ? null : _google,
+                      icon: const Text('G', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF4285F4))),
+                      label: Text('المتابعة باستخدام Google',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: fg)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: fg.withAlpha(90)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text('أو ادخل باسمك فقط', style: TextStyle(fontSize: 14, color: fg.withAlpha(150))),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _name,
                     maxLength: 40,

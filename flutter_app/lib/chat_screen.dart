@@ -7,6 +7,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import 'admin_screen.dart';
 import 'config.dart';
 import 'icons.dart';
 import 'kv_store.dart';
@@ -838,6 +839,21 @@ class _ChatScreenState extends State<ChatScreen> {
                     ]),
             ),
             const SizedBox(height: 6),
+            if (isAdminUser(sb.auth.currentUser))
+              InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminScreen()));
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+                  child: Row(children: [
+                    const Icon(Icons.admin_panel_settings_outlined, color: Pal.blue, size: 28),
+                    const SizedBox(width: 16),
+                    const Text('لوحة الإدارة', style: TextStyle(color: Pal.blue, fontSize: 17.5, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+              ),
             for (final n in nav)
               InkWell(
                 onTap: () => _toast('${n.$2}: غير متاح حالياً'),

@@ -52,6 +52,9 @@ jobs:
               s = re.sub(r"(<manifest[^>]*>)", r'\1\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>', s, count=1)
           if "RecognitionService" not in s:
               s = s.replace("</manifest>", '    <queries>\n        <intent><action android:name="android.speech.RecognitionService"/></intent>\n    </queries>\n</manifest>')
+          if "login-callback" not in s:
+              intent = '<intent-filter><action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/><category android:name="android.intent.category.BROWSABLE"/><data android:scheme="com.mostafa.chatapp" android:host="login-callback"/></intent-filter>'
+              s = s.replace("</activity>", intent + "</activity>", 1)
           s = re.sub(r'android:label="[^"]*"', 'android:label="ChatGPT"', s, count=1)
           open(p, "w", encoding="utf-8").write(s)
           PY

@@ -61,25 +61,21 @@ class Svc {
       if (d is Map && d['title'] is String) title = (d['title'] as String).trim();
     } catch (_) {}
     try {
-      final s = await sb.from('settings').select('data').eq('id', 'sg').maybeSingle();
-      final d = s?['data'];
-      final list = d is Map ? d['list'] : null;
-      if (list is List && list.isNotEmpty) {
-        final out = <Map<String, String>>[];
-        final sorted = list.whereType<Map>().toList()
-          ..sort((a, b) => ((a['order'] ?? 0) as num).compareTo((b['order'] ?? 0) as num));
-        for (final x in sorted) {
-          if (x['on'] == false) continue;
-          final t = (x['text'] ?? '').toString();
-          if (t.isEmpty) continue;
-          out.add({
-            'emoji': (x['emoji'] ?? '').toString(),
-            'text': t,
-            'answer': (x['answer'] ?? '').toString(),
-          });
-        }
-        if (out.isNotEmpty) items = out;
+      final rows = await sb.from('settings').select('id,data').like('id', 'sg_%');
+      final list = rows.map((r) => r['data']).whereType<Map>().toList()
+        ..sort((a, b) => ((a['order'] ?? 0) as num).compareTo((b['order'] ?? 0) as num));
+      final out = <Map<String, String>>[];
+      for (final x in list) {
+        if (x['on'] == false) continue;
+        final t = (x['text'] ?? '').toString();
+        if (t.isEmpty) continue;
+        out.add({
+          'emoji': (x['emoji'] ?? '').toString(),
+          'text': t,
+          'answer': (x['answer'] ?? '').toString(),
+        });
       }
+      if (out.isNotEmpty) items = out;
     } catch (_) {}
     return (title: title, items: items);
   }
