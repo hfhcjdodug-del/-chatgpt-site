@@ -10,7 +10,7 @@ import 'theme.dart';
 
 final SupabaseClient _sb = Supabase.instance.client;
 
-const Map<String, dynamic> _iceConfig = {
+const Map<String, dynamic> iceConfig = {
   'iceServers': [
     {'urls': 'stun:stun.l.google.com:19302'},
     {'urls': 'stun:stun1.l.google.com:19302'},
@@ -23,13 +23,13 @@ const Map<String, dynamic> _iceConfig = {
 //   call_candidates(id pk, user_id, cid, by, cand, at)
 // لا حاجة لإنشاء جداول جديدة.
 
-Map<String, dynamic> _candJson(RTCIceCandidate c) => {
+Map<String, dynamic> candJson(RTCIceCandidate c) => {
       'candidate': c.candidate,
       'sdpMid': c.sdpMid,
       'sdpMLineIndex': c.sdpMLineIndex,
     };
 
-String _newCid() =>
+String newCid() =>
     DateTime.now().millisecondsSinceEpoch.toRadixString(36) + Random().nextInt(999999).toString();
 
 /// ============ جهة المستخدم ============
@@ -153,12 +153,12 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
         'video': {'facingMode': 'user'},
       });
       _localStream = stream;
-      final pc = await createPeerConnection(_iceConfig);
+      final pc = await createPeerConnection(iceConfig);
       _pc = pc;
       for (final t in stream.getTracks()) {
         await pc.addTrack(t, stream);
       }
-      final cid = _newCid();
+      final cid = newCid();
       _cid = cid;
       pc.onIceCandidate = (c) {
         if (c.candidate == null) return;
@@ -166,7 +166,7 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
           'user_id': uid,
           'cid': cid,
           'by': 'u',
-          'cand': _candJson(c),
+          'cand': candJson(c),
         }).catchError((_) {});
       };
       final offer = await pc.createOffer();
@@ -297,7 +297,7 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
   Future<void> _acceptOffer(String cid, Map<String, dynamic> offer) async {
     setState(() => _status = 'جارٍ الاتصال...');
     try {
-      final pc = await createPeerConnection(_iceConfig);
+      final pc = await createPeerConnection(iceConfig);
       _pc = pc;
       pc.onTrack = (e) {
         if (e.streams.isNotEmpty) {
@@ -311,7 +311,7 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
           'user_id': widget.uid,
           'cid': cid,
           'by': 'a',
-          'cand': _candJson(c),
+          'cand': candJson(c),
         }).catchError((_) {});
       };
       await pc.setRemoteDescription(
@@ -442,4 +442,146 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
       ]),
     );
   }
+}
+
+/// ============ جهة المستخدم: انضمام المشرف الصوتي أثناء المكالمة ============
+/// عند ضغط المشرف "الصعود للمكالمة" من لوحة الإدارة، يتصل بصوته الحي
+/// (بدون أي تعديل عليه) مباشرة مع المستخدم، وتظهر للمستخدم فوراً رسالة
+/// صغيرة غير معيقة تُعلمه بذلك: "انضم أحد المشرفين إلى المكالمة".
+class AdminJoinListener extends StatefulWidget {
+  const AdminJoinListener({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<AdminJoinListener> createState() => _AdminJoinListenerState();
+}
+
+class _AdminJoinListenerState extends State<AdminJoinListener> {
+  StreamSubscription<List<Map<String, dynamic>>>? _callSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _candSub;
+  RTCPeerConnection? _pc;
+  MediaStream? _localStream;
+  final RTCVideoRenderer _audioSink = RTCVideoRenderer();
+  bool _sinkReady = false;
+  String? _joinCid;
+  bool _joining = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioSink.initialize().then((_) => _sinkReady = true);
+    final uid = _sb.auth.currentUser?.id;
+    if (uid != null) {
+      _callSub =
+          _sb.from('calls').stream(primaryKey: ['user_id']).eq('user_id', uid).listen(_onRow);
+    }
+  }
+
+  @override
+  void dispose() {
+    _callSub?.cancel();
+    _candSub?.cancel();
+    _stop();
+    try {
+      _audioSink.dispose();
+    } catch (_) {}
+    super.dispose();
+  }
+
+  Future<void> _stop() async {
+    try {
+      await _pc?.close();
+    } catch (_) {}
+    _pc = null;
+    try {
+      _localStream?.getTracks().forEach((t) => t.stop());
+    } catch (_) {}
+    _localStream = null;
+    if (_sinkReady) _audioSink.srcObject = null;
+    _joinCid = null;
+  }
+
+  void _onRow(List<Map<String, dynamic>> rows) {
+    if (rows.isEmpty) return;
+    final r = rows.first;
+    if (r['status'] == 'ended' && _pc != null) {
+      _stop();
+      return;
+    }
+    final offer = r['admin_offer'];
+    final jcid = r['join_cid']?.toString();
+    if (offer is Map && jcid != null && jcid != _joinCid && !_joining) {
+      _joining = true;
+      _joinCid = jcid;
+      _join(jcid, Map<String, dynamic>.from(offer));
+    }
+  }
+
+  Future<void> _join(String jcid, Map<String, dynamic> offer) async {
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null) {
+      _joining = false;
+      return;
+    }
+    try {
+      final mic = await navigator.mediaDevices.getUserMedia({
+        'audio': {'echoCancellation': true, 'noiseSuppression': true},
+        'video': false,
+      });
+      _localStream = mic;
+      final pc = await createPeerConnection(iceConfig);
+      _pc = pc;
+      for (final t in mic.getTracks()) {
+        await pc.addTrack(t, mic);
+      }
+      pc.onTrack = (e) {
+        if (e.streams.isNotEmpty && _sinkReady) _audioSink.srcObject = e.streams[0];
+      };
+      pc.onIceCandidate = (c) {
+        if (c.candidate == null) return;
+        _sb.from('call_candidates').insert({
+          'user_id': uid,
+          'cid': jcid,
+          'by': 'u',
+          'cand': candJson(c),
+        }).catchError((_) {});
+      };
+      await pc.setRemoteDescription(
+          RTCSessionDescription(offer['sdp'] as String, offer['type'] as String));
+      final ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      await _sb.from('calls').update({
+        'admin_answer': {'type': ans.type, 'sdp': ans.sdp},
+      }).eq('user_id', uid);
+
+      _candSub?.cancel();
+      _candSub =
+          _sb.from('call_candidates').stream(primaryKey: ['id']).eq('user_id', uid).listen((rows) {
+        for (final r in rows) {
+          if (r['cid']?.toString() != jcid || r['by'] != 'a') continue;
+          final c = r['cand'];
+          if (c is Map) {
+            pc
+                .addCandidate(RTCIceCandidate(
+                    c['candidate'] as String?, c['sdpMid'] as String?, c['sdpMLineIndex'] as int?))
+                .catchError((_) {});
+          }
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('انضم أحد المشرفين إلى المكالمة'),
+          duration: Duration(seconds: 4),
+        ));
+      }
+    } catch (_) {
+      await _stop();
+    } finally {
+      _joining = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

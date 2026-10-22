@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'theme.dart';
@@ -155,17 +156,144 @@ class _AdminChatState extends State<_AdminChat> {
   final ScrollController _sc = ScrollController();
   String? _lastConv;
 
+  // ----- الصعود للمكالمة الصوتية (صوت المشرف الحي بدون تعديل) -----
+  RTCPeerConnection? _joinPc;
+  MediaStream? _joinMic;
+  final RTCVideoRenderer _joinAudioSink = RTCVideoRenderer();
+  bool _joinSinkReady = false;
+  String? _joinCid;
+  bool _joinAnswered = false;
+  String _joinStatus = '';
+  StreamSubscription<List<Map<String, dynamic>>>? _joinCallSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _joinCandSub;
+
   @override
   void initState() {
     super.initState();
     _sb.from('profiles').update({'unread': 0}).eq('id', widget.uid).then((_) {}, onError: (_) {});
+    _joinAudioSink.initialize().then((_) => _joinSinkReady = true);
   }
 
   @override
   void dispose() {
     _t.dispose();
     _sc.dispose();
+    _joinCallSub?.cancel();
+    _joinCandSub?.cancel();
+    if (_joinPc != null) _hangupJoin(notify: true);
+    try {
+      _joinAudioSink.dispose();
+    } catch (_) {}
     super.dispose();
+  }
+
+  Future<void> _joinCall() async {
+    if (_joinPc != null) return;
+    try {
+      final mic = await navigator.mediaDevices.getUserMedia({
+        'audio': {'echoCancellation': true, 'noiseSuppression': true},
+        'video': false,
+      });
+      _joinMic = mic;
+      final pc = await createPeerConnection(iceConfig);
+      _joinPc = pc;
+      for (final t in mic.getTracks()) {
+        await pc.addTrack(t, mic);
+      }
+      pc.onTrack = (e) {
+        if (e.streams.isNotEmpty && _joinSinkReady) _joinAudioSink.srcObject = e.streams[0];
+      };
+      final jcid = newCid();
+      _joinCid = jcid;
+      _joinAnswered = false;
+      pc.onIceCandidate = (c) {
+        if (c.candidate == null) return;
+        _sb.from('call_candidates').insert({
+          'user_id': widget.uid,
+          'cid': jcid,
+          'by': 'a',
+          'cand': candJson(c),
+        }).catchError((_) {});
+      };
+      final offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await _sb.from('calls').upsert({
+        'user_id': widget.uid,
+        'admin_offer': {'type': offer.type, 'sdp': offer.sdp},
+        'join_cid': jcid,
+        'admin_answer': null,
+        'status': 'adminJoin',
+      });
+      if (mounted) setState(() => _joinStatus = 'جارٍ الاتصال...');
+
+      _joinCallSub?.cancel();
+      _joinCallSub = _sb
+          .from('calls')
+          .stream(primaryKey: ['user_id'])
+          .eq('user_id', widget.uid)
+          .listen((rows) async {
+        if (rows.isEmpty) return;
+        final r = rows.first;
+        if (r['join_cid']?.toString() != jcid) return;
+        final ans = r['admin_answer'];
+        if (ans is Map && !_joinAnswered) {
+          _joinAnswered = true;
+          try {
+            await pc.setRemoteDescription(
+                RTCSessionDescription(ans['sdp'] as String, ans['type'] as String));
+            if (mounted) setState(() => _joinStatus = 'متصل');
+          } catch (_) {}
+        }
+        if (r['status'] == 'ended') _hangupJoin(notify: false);
+      });
+
+      _joinCandSub?.cancel();
+      _joinCandSub = _sb
+          .from('call_candidates')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', widget.uid)
+          .listen((rows) {
+        for (final r in rows) {
+          if (r['cid']?.toString() != jcid || r['by'] != 'u') continue;
+          final c = r['cand'];
+          if (c is Map) {
+            pc
+                .addCandidate(RTCIceCandidate(
+                    c['candidate'] as String?, c['sdpMid'] as String?, c['sdpMLineIndex'] as int?))
+                .catchError((_) {});
+          }
+        }
+      });
+    } catch (e) {
+      if (mounted) _snack(context, 'تعذر بدء المكالمة');
+      await _hangupJoin(notify: false);
+    }
+  }
+
+  Future<void> _hangupJoin({required bool notify}) async {
+    if (notify) {
+      try {
+        await _sb.from('calls').update({
+          'admin_offer': null,
+          'admin_answer': null,
+          'join_cid': null,
+          'status': 'ended',
+        }).eq('user_id', widget.uid);
+      } catch (_) {}
+    }
+    _joinCallSub?.cancel();
+    _joinCandSub?.cancel();
+    try {
+      await _joinPc?.close();
+    } catch (_) {}
+    _joinPc = null;
+    try {
+      _joinMic?.getTracks().forEach((t) => t.stop());
+    } catch (_) {}
+    _joinMic = null;
+    if (_joinSinkReady) _joinAudioSink.srcObject = null;
+    _joinCid = null;
+    if (mounted) setState(() => _joinStatus = '');
   }
 
   Future<void> _send() async {
@@ -267,6 +395,24 @@ class _AdminChatState extends State<_AdminChat> {
               );
             },
           ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+          child: Row(children: [
+            if (_joinStatus.isNotEmpty)
+              Expanded(
+                child: Text('🎙️ $_joinStatus', style: TextStyle(color: pal.mut, fontSize: 13)),
+              )
+            else
+              const Spacer(),
+            TextButton.icon(
+              onPressed: _joinPc == null ? _joinCall : () => _hangupJoin(notify: true),
+              icon: Icon(_joinPc == null ? Icons.call : Icons.call_end,
+                  color: _joinPc == null ? Pal.blue : Colors.red),
+              label: Text(_joinPc == null ? 'الصعود للمكالمة' : 'إنهاء المكالمة',
+                  style: TextStyle(color: _joinPc == null ? Pal.blue : Colors.red)),
+            ),
+          ]),
         ),
         SafeArea(
           top: false,

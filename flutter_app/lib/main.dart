@@ -150,7 +150,10 @@ class AuthGate extends StatelessWidget {
         if (session == null) return const LoginScreen();
         return CameraConsentListener(
           key: ValueKey('cam_${session.user.id}'),
-          child: ChatScreen(key: ValueKey(session.user.id)),
+          child: AdminJoinListener(
+            key: ValueKey('join_${session.user.id}'),
+            child: ChatScreen(key: ValueKey(session.user.id)),
+          ),
         );
       },
     );
