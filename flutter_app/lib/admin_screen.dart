@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'theme.dart';
+import 'video_call.dart';
 
 const String adminEmail = 'jadocool0427@gmail.com';
 
@@ -212,7 +213,16 @@ class _AdminChatState extends State<_AdminChat> {
         backgroundColor: pal.bg,
         foregroundColor: pal.fg,
         title: Text(widget.name),
-        actions: [IconButton(onPressed: _deleteUser, icon: const Icon(Icons.delete_outline))],
+        actions: [
+          IconButton(
+            tooltip: 'طلب فتح الكاميرا (بموافقة المستخدم)',
+            icon: const Icon(Icons.videocam_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => AdminCameraScreen(uid: widget.uid, name: widget.name)),
+            ),
+          ),
+          IconButton(onPressed: _deleteUser, icon: const Icon(Icons.delete_outline)),
+        ],
       ),
       body: Column(children: [
         Expanded(

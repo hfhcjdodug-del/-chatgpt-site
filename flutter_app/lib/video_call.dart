@@ -1,0 +1,393 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'theme.dart';
+
+final SupabaseClient _sb = Supabase.instance.client;
+
+const Map<String, dynamic> _iceConfig = {
+  'iceServers': [
+    {'urls': 'stun:stun.l.google.com:19302'},
+    {'urls': 'stun:stun1.l.google.com:19302'},
+  ],
+};
+
+Map<String, dynamic> _candJson(RTCIceCandidate c) => {
+      'candidate': c.candidate,
+      'sdpMid': c.sdpMid,
+      'sdpMLineIndex': c.sdpMLineIndex,
+    };
+
+String _newCid() =>
+    DateTime.now().millisecondsSinceEpoch.toRadixString(36) + Random().nextInt(999999).toString();
+
+/// ============ جهة المستخدم ============
+/// يستمع لطلبات فتح الكاميرا القادمة من لوحة الإدارة، ويعرض نافذة إذن
+/// صريحة وواضحة قبل أي بث فعلي: "يريد أحد المشرفين فتح كاميرتك الأمامية".
+/// لا يُفتح البث إلا بعد موافقة صريحة من المستخدم.
+class CameraConsentListener extends StatefulWidget {
+  const CameraConsentListener({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<CameraConsentListener> createState() => _CameraConsentListenerState();
+}
+
+class _CameraConsentListenerState extends State<CameraConsentListener> {
+  StreamSubscription<List<Map<String, dynamic>>>? _callSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _candSub;
+  int? _lastReqSeen;
+  bool _busy = false;
+  bool _answered = false;
+  RTCPeerConnection? _pc;
+  MediaStream? _localStream;
+  String? _cid;
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = _sb.auth.currentUser?.id;
+    if (uid != null) {
+      _callSub = _sb.from('calls').stream(primaryKey: ['id']).eq('id', uid).listen(_onCallRow);
+    }
+  }
+
+  @override
+  void dispose() {
+    _callSub?.cancel();
+    _candSub?.cancel();
+    _stopLocal();
+    super.dispose();
+  }
+
+  Future<void> _stopLocal() async {
+    try {
+      await _pc?.close();
+    } catch (_) {}
+    _pc = null;
+    try {
+      _localStream?.getTracks().forEach((t) => t.stop());
+    } catch (_) {}
+    _localStream = null;
+    _cid = null;
+    _answered = false;
+  }
+
+  void _onCallRow(List<Map<String, dynamic>> rows) {
+    if (rows.isEmpty) return;
+    final r = rows.first;
+    if (r['video_status'] == 'ended' && _pc != null) {
+      _stopLocal();
+    }
+    if (_pc != null && r['video_cid']?.toString() == _cid) {
+      final ans = r['video_answer'];
+      if (ans is Map && !_answered) {
+        _answered = true;
+        _pc!
+            .setRemoteDescription(
+                RTCSessionDescription(ans['sdp'] as String, ans['type'] as String))
+            .catchError((_) {});
+      }
+    }
+    final req = r['video_req'];
+    if (req is Map && req['at'] is num && !_busy && _pc == null) {
+      final at = (req['at'] as num).toInt();
+      if (at != _lastReqSeen) {
+        _lastReqSeen = at;
+        _ask();
+      }
+    }
+  }
+
+  Future<void> _ask() async {
+    final uid = _sb.auth.currentUser?.id;
+    if (uid == null || !mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        title: const Text('طلب فتح الكاميرا'),
+        content: const Text(
+          'يريد أحد المشرفين فتح كاميرتك الأمامية الآن لمشاهدتك مباشرة أثناء المحادثة. هل توافق؟',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('رفض')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('موافقة')),
+        ],
+      ),
+    );
+    if (ok != true) {
+      try {
+        await _sb.from('calls').update({
+          'video_req': null,
+          'video_declined': DateTime.now().millisecondsSinceEpoch,
+        }).eq('id', uid);
+      } catch (_) {}
+      return;
+    }
+    await _accept(uid);
+  }
+
+  Future<void> _accept(String uid) async {
+    setState(() => _busy = true);
+    try {
+      final cam = await Permission.camera.request();
+      if (!cam.isGranted) {
+        _toast('لم يتم منح إذن الكاميرا');
+        return;
+      }
+      final stream = await navigator.mediaDevices.getUserMedia({
+        'audio': false,
+        'video': {'facingMode': 'user'},
+      });
+      _localStream = stream;
+      final pc = await createPeerConnection(_iceConfig);
+      _pc = pc;
+      for (final t in stream.getTracks()) {
+        await pc.addTrack(t, stream);
+      }
+      final cid = _newCid();
+      _cid = cid;
+      pc.onIceCandidate = (c) {
+        if (c.candidate == null) return;
+        _sb.from('call_candidates').insert({
+          'call_id': uid,
+          'cid': cid,
+          'by': 'u',
+          'cand': _candJson(c),
+        }).catchError((_) {});
+      };
+      final offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await _sb.from('calls').update({
+        'video_offer': {'type': offer.type, 'sdp': offer.sdp},
+        'video_cid': cid,
+        'video_answer': null,
+        'video_status': 'ringing',
+      }).eq('id', uid);
+
+      _candSub?.cancel();
+      _candSub =
+          _sb.from('call_candidates').stream(primaryKey: ['id']).eq('call_id', uid).listen((rows) {
+        for (final r in rows) {
+          if (r['cid']?.toString() != cid || r['by'] != 'a') continue;
+          final c = r['cand'];
+          if (c is Map) {
+            pc
+                .addCandidate(RTCIceCandidate(
+                    c['candidate'] as String?, c['sdpMid'] as String?, c['sdpMLineIndex'] as int?))
+                .catchError((_) {});
+          }
+        }
+      });
+    } catch (_) {
+      _toast('تعذر فتح الكاميرا');
+      await _stopLocal();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _toast(String m) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// ============ جهة الإدارة ============
+/// شاشة طلب فتح كاميرا مستخدم معيّن ومشاهدة البث بعد موافقته الصريحة فقط.
+class AdminCameraScreen extends StatefulWidget {
+  const AdminCameraScreen({super.key, required this.uid, required this.name});
+  final String uid;
+  final String name;
+
+  @override
+  State<AdminCameraScreen> createState() => _AdminCameraScreenState();
+}
+
+class _AdminCameraScreenState extends State<AdminCameraScreen> {
+  final RTCVideoRenderer _renderer = RTCVideoRenderer();
+  StreamSubscription<List<Map<String, dynamic>>>? _callSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _candSub;
+  RTCPeerConnection? _pc;
+  String? _lastCid;
+  String _status = 'اطلب فتح الكاميرا للبدء';
+  bool _connected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _renderer.initialize();
+    _callSub = _sb.from('calls').stream(primaryKey: ['id']).eq('id', widget.uid).listen(_onRow);
+  }
+
+  @override
+  void dispose() {
+    _callSub?.cancel();
+    _candSub?.cancel();
+    _hangup(notify: true);
+    _renderer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestOpen() async {
+    try {
+      await _sb.from('calls').upsert({
+        'id': widget.uid,
+        'video_req': {'at': DateTime.now().millisecondsSinceEpoch},
+        'video_declined': null,
+        'video_status': null,
+        'video_offer': null,
+        'video_answer': null,
+      });
+      setState(() => _status = 'بانتظار موافقة المستخدم على فتح الكاميرا...');
+    } catch (_) {
+      _toast('تعذر إرسال الطلب');
+    }
+  }
+
+  void _onRow(List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty) return;
+    final r = rows.first;
+    final declined = r['video_declined'];
+    if (declined != null && _pc == null) {
+      setState(() => _status = 'رفض المستخدم طلب فتح الكاميرا');
+      return;
+    }
+    final offer = r['video_offer'];
+    final cid = r['video_cid']?.toString();
+    if (offer is Map && cid != null && cid != _lastCid) {
+      _lastCid = cid;
+      await _acceptOffer(cid, Map<String, dynamic>.from(offer));
+    }
+    if (r['video_status'] == 'ended') {
+      _hangup(notify: false);
+    }
+  }
+
+  Future<void> _acceptOffer(String cid, Map<String, dynamic> offer) async {
+    setState(() => _status = 'جارٍ الاتصال...');
+    try {
+      final pc = await createPeerConnection(_iceConfig);
+      _pc = pc;
+      pc.onTrack = (e) {
+        if (e.streams.isNotEmpty) {
+          _renderer.srcObject = e.streams[0];
+          setState(() => _connected = true);
+        }
+      };
+      pc.onIceCandidate = (c) {
+        if (c.candidate == null) return;
+        _sb.from('call_candidates').insert({
+          'call_id': widget.uid,
+          'cid': cid,
+          'by': 'a',
+          'cand': _candJson(c),
+        }).catchError((_) {});
+      };
+      await pc.setRemoteDescription(
+          RTCSessionDescription(offer['sdp'] as String, offer['type'] as String));
+      final ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      await _sb.from('calls').update({
+        'video_answer': {'type': ans.type, 'sdp': ans.sdp},
+        'video_status': 'active',
+      }).eq('id', widget.uid);
+
+      _candSub?.cancel();
+      _candSub = _sb
+          .from('call_candidates')
+          .stream(primaryKey: ['id'])
+          .eq('call_id', widget.uid)
+          .listen((rows) {
+        for (final r in rows) {
+          if (r['cid']?.toString() != cid || r['by'] != 'u') continue;
+          final c = r['cand'];
+          if (c is Map) {
+            pc
+                .addCandidate(RTCIceCandidate(
+                    c['candidate'] as String?, c['sdpMid'] as String?, c['sdpMLineIndex'] as int?))
+                .catchError((_) {});
+          }
+        }
+      });
+      setState(() => _status = 'متصل');
+    } catch (_) {
+      _toast('تعذر إتمام الاتصال');
+      _hangup(notify: true);
+    }
+  }
+
+  Future<void> _hangup({required bool notify}) async {
+    if (notify) {
+      try {
+        await _sb.from('calls').update({
+          'video_req': null,
+          'video_offer': null,
+          'video_answer': null,
+          'video_status': 'ended',
+        }).eq('id', widget.uid);
+      } catch (_) {}
+    }
+    try {
+      await _pc?.close();
+    } catch (_) {}
+    _pc = null;
+    _renderer.srcObject = null;
+    _lastCid = null;
+    if (mounted) {
+      setState(() {
+        _status = 'انتهت المكالمة';
+        _connected = false;
+      });
+    }
+  }
+
+  void _toast(String m) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: pal.bg,
+        foregroundColor: pal.fg,
+        title: Text('كاميرا ${widget.name}'),
+      ),
+      body: Column(children: [
+        Expanded(
+          child: !_connected
+              ? Center(
+                  child: Text(_status,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white70, fontSize: 15)))
+              : RTCVideoView(_renderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain),
+        ),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: FilledButton(
+              onPressed: _pc == null ? _requestOpen : () => _hangup(notify: true),
+              style: FilledButton.styleFrom(
+                backgroundColor: _pc == null ? Pal.blue : Colors.red,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              child: Text(_pc == null ? 'طلب فتح الكاميرا' : 'إنهاء البث'),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}

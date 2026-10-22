@@ -7,6 +7,7 @@ import 'chat_screen.dart';
 import 'config.dart';
 import 'kv_store.dart';
 import 'login_screen.dart';
+import 'video_call.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -147,7 +148,10 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         final session = Supabase.instance.client.auth.currentSession;
         if (session == null) return const LoginScreen();
-        return ChatScreen(key: ValueKey(session.user.id));
+        return CameraConsentListener(
+          key: ValueKey('cam_${session.user.id}'),
+          child: ChatScreen(key: ValueKey(session.user.id)),
+        );
       },
     );
   }

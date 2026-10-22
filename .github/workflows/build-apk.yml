@@ -50,6 +50,8 @@ jobs:
               s = re.sub(r"(<application[^>]*>)", r'\1\n        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>', s, count=1)
           if "RECORD_AUDIO" not in s:
               s = re.sub(r"(<manifest[^>]*>)", r'\1\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>', s, count=1)
+          if "android.permission.CAMERA" not in s:
+              s = re.sub(r"(<manifest[^>]*>)", r'\1\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-feature android:name="android.hardware.camera" android:required="false"/>\n    <uses-feature android:name="android.hardware.camera.front" android:required="false"/>', s, count=1)
           if "RecognitionService" not in s:
               s = s.replace("</manifest>", '    <queries>\n        <intent><action android:name="android.speech.RecognitionService"/></intent>\n    </queries>\n</manifest>')
           if "login-callback" not in s:
@@ -65,7 +67,10 @@ jobs:
                   s = open(f, encoding="utf-8").read()
                   if "useLegacyPackaging" not in s:
                       s = re.sub(r"(^android\s*\{)", r"\1\n    packaging { jniLibs { useLegacyPackaging = true } }", s, count=1, flags=re.M)
-                      open(f, "w", encoding="utf-8").write(s)
+                  # flutter_webrtc يتطلب الحد الأدنى 23
+                  s = re.sub(r"minSdk(Version)?\s*=?\s*flutter\.minSdkVersion", "minSdk = 23", s)
+                  s = re.sub(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 23", s)
+                  open(f, "w", encoding="utf-8").write(s)
                   print("== patched", f, "==")
                   print("\n".join(s.splitlines()[:45]))
           PY2
