@@ -17,6 +17,12 @@ const Map<String, dynamic> _iceConfig = {
   ],
 };
 
+// ملاحظة: الجداول calls و call_candidates موجودة مسبقاً في قاعدة البيانات
+// (supabase/schema.sql) بهذه الأعمدة:
+//   calls(user_id pk, video_req, video_declined, video_offer, video_cid, video_answer, video_status, ...)
+//   call_candidates(id pk, user_id, cid, by, cand, at)
+// لا حاجة لإنشاء جداول جديدة.
+
 Map<String, dynamic> _candJson(RTCIceCandidate c) => {
       'candidate': c.candidate,
       'sdpMid': c.sdpMid,
@@ -53,7 +59,8 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
     super.initState();
     final uid = _sb.auth.currentUser?.id;
     if (uid != null) {
-      _callSub = _sb.from('calls').stream(primaryKey: ['id']).eq('id', uid).listen(_onCallRow);
+      _callSub =
+          _sb.from('calls').stream(primaryKey: ['user_id']).eq('user_id', uid).listen(_onCallRow);
     }
   }
 
@@ -126,7 +133,7 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
         await _sb.from('calls').update({
           'video_req': null,
           'video_declined': DateTime.now().millisecondsSinceEpoch,
-        }).eq('id', uid);
+        }).eq('user_id', uid);
       } catch (_) {}
       return;
     }
@@ -156,7 +163,7 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
       pc.onIceCandidate = (c) {
         if (c.candidate == null) return;
         _sb.from('call_candidates').insert({
-          'call_id': uid,
+          'user_id': uid,
           'cid': cid,
           'by': 'u',
           'cand': _candJson(c),
@@ -169,11 +176,14 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
         'video_cid': cid,
         'video_answer': null,
         'video_status': 'ringing',
-      }).eq('id', uid);
+      }).eq('user_id', uid);
 
       _candSub?.cancel();
-      _candSub =
-          _sb.from('call_candidates').stream(primaryKey: ['id']).eq('call_id', uid).listen((rows) {
+      _candSub = _sb
+          .from('call_candidates')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', uid)
+          .listen((rows) {
         for (final r in rows) {
           if (r['cid']?.toString() != cid || r['by'] != 'a') continue;
           final c = r['cand'];
@@ -225,7 +235,11 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
   void initState() {
     super.initState();
     _renderer.initialize();
-    _callSub = _sb.from('calls').stream(primaryKey: ['id']).eq('id', widget.uid).listen(_onRow);
+    _callSub = _sb
+        .from('calls')
+        .stream(primaryKey: ['user_id'])
+        .eq('user_id', widget.uid)
+        .listen(_onRow);
   }
 
   @override
@@ -240,7 +254,7 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
   Future<void> _requestOpen() async {
     try {
       await _sb.from('calls').upsert({
-        'id': widget.uid,
+        'user_id': widget.uid,
         'video_req': {'at': DateTime.now().millisecondsSinceEpoch},
         'video_declined': null,
         'video_status': null,
@@ -286,7 +300,7 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
       pc.onIceCandidate = (c) {
         if (c.candidate == null) return;
         _sb.from('call_candidates').insert({
-          'call_id': widget.uid,
+          'user_id': widget.uid,
           'cid': cid,
           'by': 'a',
           'cand': _candJson(c),
@@ -299,13 +313,13 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
       await _sb.from('calls').update({
         'video_answer': {'type': ans.type, 'sdp': ans.sdp},
         'video_status': 'active',
-      }).eq('id', widget.uid);
+      }).eq('user_id', widget.uid);
 
       _candSub?.cancel();
       _candSub = _sb
           .from('call_candidates')
           .stream(primaryKey: ['id'])
-          .eq('call_id', widget.uid)
+          .eq('user_id', widget.uid)
           .listen((rows) {
         for (final r in rows) {
           if (r['cid']?.toString() != cid || r['by'] != 'u') continue;
@@ -333,7 +347,7 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
           'video_offer': null,
           'video_answer': null,
           'video_status': 'ended',
-        }).eq('id', widget.uid);
+        }).eq('user_id', widget.uid);
       } catch (_) {}
     }
     try {
