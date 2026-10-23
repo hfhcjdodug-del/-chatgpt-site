@@ -156,10 +156,19 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
         _toast('لم يتم منح إذن الكاميرا');
         return;
       }
-      final stream = await navigator.mediaDevices.getUserMedia({
-        'audio': false,
-        'video': {'facingMode': 'user'},
-      });
+      MediaStream stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          'audio': false,
+          'video': {'facingMode': 'user'},
+        });
+      } catch (_) {
+        // بعض الأجهزة لا تدعم قيد facingMode؛ نجرّب الكاميرا الافتراضية
+        stream = await navigator.mediaDevices.getUserMedia({
+          'audio': false,
+          'video': true,
+        });
+      }
       _localStream = stream;
       final pc = await createPeerConnection(iceConfig);
       _pc = pc;
@@ -469,15 +478,12 @@ class _AdminJoinListenerState extends State<AdminJoinListener> {
   StreamSubscription<List<Map<String, dynamic>>>? _candSub;
   RTCPeerConnection? _pc;
   MediaStream? _localStream;
-  final RTCVideoRenderer _audioSink = RTCVideoRenderer();
-  bool _sinkReady = false;
   String? _joinCid;
   bool _joining = false;
 
   @override
   void initState() {
     super.initState();
-    _audioSink.initialize().then((_) => _sinkReady = true);
     final uid = _sb.auth.currentUser?.id;
     if (uid != null) {
       _callSub =
@@ -490,9 +496,6 @@ class _AdminJoinListenerState extends State<AdminJoinListener> {
     _callSub?.cancel();
     _candSub?.cancel();
     _stop();
-    try {
-      _audioSink.dispose();
-    } catch (_) {}
     super.dispose();
   }
 
@@ -505,7 +508,6 @@ class _AdminJoinListenerState extends State<AdminJoinListener> {
       _localStream?.getTracks().forEach((t) => t.stop());
     } catch (_) {}
     _localStream = null;
-    if (_sinkReady) _audioSink.srcObject = null;
     _joinCid = null;
   }
 
@@ -566,9 +568,9 @@ class _AdminJoinListenerState extends State<AdminJoinListener> {
       for (final t in mic.getTracks()) {
         await pc.addTrack(t, mic);
       }
-      pc.onTrack = (e) {
-        if (e.streams.isNotEmpty && _sinkReady) _audioSink.srcObject = e.streams[0];
-      };
+      // لا حاجة لربط الصوت الوارد بأي عارض: يُشغَّل تلقائياً عبر مكبر الجهاز
+      // بمجرد إضافته لاتصال WebRTC (ربطه بـ RTCVideoRenderer غير لازم لصوت
+      // بلا فيديو وقد يسبب تعطلاً على بعض الأجهزة).
       pc.onIceCandidate = (c) {
         if (c.candidate == null) return;
         _sb.from('call_candidates').insert({

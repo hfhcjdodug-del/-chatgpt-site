@@ -160,8 +160,6 @@ class _AdminChatState extends State<_AdminChat> {
   // ----- الصعود للمكالمة الصوتية (صوت المشرف الحي بدون تعديل) -----
   RTCPeerConnection? _joinPc;
   MediaStream? _joinMic;
-  final RTCVideoRenderer _joinAudioSink = RTCVideoRenderer();
-  bool _joinSinkReady = false;
   String? _joinCid;
   bool _joinAnswered = false;
   String _joinStatus = '';
@@ -174,7 +172,6 @@ class _AdminChatState extends State<_AdminChat> {
   void initState() {
     super.initState();
     _sb.from('profiles').update({'unread': 0}).eq('id', widget.uid).then((_) {}, onError: (_) {});
-    _joinAudioSink.initialize().then((_) => _joinSinkReady = true);
     _voiceActiveSub =
         _sb.from('profiles').stream(primaryKey: ['id']).eq('id', widget.uid).listen((rows) {
       if (rows.isEmpty || !mounted) return;
@@ -191,9 +188,6 @@ class _AdminChatState extends State<_AdminChat> {
     _joinCandSub?.cancel();
     _voiceActiveSub?.cancel();
     if (_joinPc != null) _hangupJoin(notify: true);
-    try {
-      _joinAudioSink.dispose();
-    } catch (_) {}
     super.dispose();
   }
 
@@ -215,9 +209,8 @@ class _AdminChatState extends State<_AdminChat> {
       for (final t in mic.getTracks()) {
         await pc.addTrack(t, mic);
       }
-      pc.onTrack = (e) {
-        if (e.streams.isNotEmpty && _joinSinkReady) _joinAudioSink.srcObject = e.streams[0];
-      };
+      // لا نحتاج عارضاً لتشغيل الصوت الوارد: WebRTC يشغّله تلقائياً عبر
+      // المكبر بمجرد إضافته (ربطه بعارض فيديو بلا فيديو فعلي قد يسبب تعطلاً).
       final jcid = newCid();
       _joinCid = jcid;
       _joinAnswered = false;
@@ -307,7 +300,6 @@ class _AdminChatState extends State<_AdminChat> {
       _joinMic?.getTracks().forEach((t) => t.stop());
     } catch (_) {}
     _joinMic = null;
-    if (_joinSinkReady) _joinAudioSink.srcObject = null;
     _joinCid = null;
     if (mounted) setState(() => _joinStatus = '');
   }
