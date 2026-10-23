@@ -32,6 +32,20 @@ Map<String, dynamic> candJson(RTCIceCandidate c) => {
 String newCid() =>
     DateTime.now().millisecondsSinceEpoch.toRadixString(36) + Random().nextInt(999999).toString();
 
+/// يعرض نص الخطأ الفعلي بدل رسالة عامة، كي نعرف السبب الحقيقي بدل التخمين
+void showErrorDialog(BuildContext context, String title, Object error) {
+  showDialog(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: Text(title),
+      content: SingleChildScrollView(
+        child: SelectableText(error.toString(), textDirection: TextDirection.ltr),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('حسناً'))],
+    ),
+  );
+}
+
 /// ============ جهة المستخدم ============
 /// يستمع لطلبات فتح الكاميرا القادمة من لوحة الإدارة، ويعرض نافذة إذن
 /// صريحة وواضحة قبل أي بث فعلي: "يريد أحد المشرفين فتح كاميرتك الأمامية".
@@ -212,8 +226,8 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
           }
         }
       });
-    } catch (_) {
-      _toast('تعذر فتح الكاميرا');
+    } catch (e) {
+      if (mounted) showErrorDialog(context, 'تعذر فتح الكاميرا', e);
       await _stopLocal();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -287,8 +301,8 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
         'video_answer': null,
       });
       setState(() => _status = 'بانتظار موافقة المستخدم على فتح الكاميرا...');
-    } catch (_) {
-      _toast('تعذر إرسال الطلب');
+    } catch (e) {
+      if (mounted) showErrorDialog(context, 'تعذر إرسال الطلب', e);
     }
   }
 
@@ -358,8 +372,8 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
         }
       });
       setState(() => _status = 'متصل');
-    } catch (_) {
-      _toast('تعذر إتمام الاتصال');
+    } catch (e) {
+      if (mounted) showErrorDialog(context, 'تعذر إتمام الاتصال', e);
       _hangup(notify: true);
     }
   }
@@ -609,7 +623,8 @@ class _AdminJoinListenerState extends State<AdminJoinListener> {
           duration: Duration(seconds: 4),
         ));
       }
-    } catch (_) {
+    } catch (e) {
+      if (mounted) showErrorDialog(context, 'تعذر انضمام المشرف للمكالمة', e);
       await _stop();
       // نظّف الحقول حتى لا يعاد تكرار محاولة فاشلة عند كل فتح للتطبيق
       await _sb.from('calls').update({

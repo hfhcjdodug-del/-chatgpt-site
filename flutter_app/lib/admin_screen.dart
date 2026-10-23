@@ -274,7 +274,7 @@ class _AdminChatState extends State<_AdminChat> {
         }
       });
     } catch (e) {
-      if (mounted) _snack(context, 'تعذر بدء المكالمة');
+      if (mounted) showErrorDialog(context, 'تعذر بدء المكالمة', e);
       await _hangupJoin(notify: false);
     }
   }
