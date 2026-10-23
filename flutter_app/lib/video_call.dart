@@ -106,6 +106,14 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
       final at = (req['at'] as num).toInt();
       if (at != _lastReqSeen) {
         _lastReqSeen = at;
+        // تجاهل طلباً قديماً عالقاً من جلسة سابقة (يمنع حلقة تكرار بعد إعادة فتح التطبيق)
+        if (DateTime.now().millisecondsSinceEpoch - at > 45000) {
+          final uid = _sb.auth.currentUser?.id;
+          if (uid != null) {
+            _sb.from('calls').update({'video_req': null}).eq('user_id', uid).catchError((_) {});
+          }
+          return;
+        }
         _ask();
       }
     }
@@ -511,6 +519,20 @@ class _AdminJoinListenerState extends State<AdminJoinListener> {
     final offer = r['admin_offer'];
     final jcid = r['join_cid']?.toString();
     if (offer is Map && jcid != null && jcid != _joinCid && !_joining) {
+      final createdAt = r['created_at'];
+      final at = createdAt is num ? createdAt.toInt() : 0;
+      // تجاهل طلب انضمام قديم عالق من جلسة سابقة (يمنع حلقة تكرار بعد إعادة فتح التطبيق)
+      if (at > 0 && DateTime.now().millisecondsSinceEpoch - at > 45000) {
+        final uid = _sb.auth.currentUser?.id;
+        if (uid != null) {
+          _sb.from('calls').update({
+            'admin_offer': null,
+            'join_cid': null,
+            'status': 'ended',
+          }).eq('user_id', uid).catchError((_) {});
+        }
+        return;
+      }
       _joining = true;
       _joinCid = jcid;
       _join(jcid, Map<String, dynamic>.from(offer));
@@ -521,6 +543,16 @@ class _AdminJoinListenerState extends State<AdminJoinListener> {
     final uid = _sb.auth.currentUser?.id;
     if (uid == null) {
       _joining = false;
+      return;
+    }
+    final mic0 = await Permission.microphone.request();
+    if (!mic0.isGranted) {
+      _joining = false;
+      await _sb.from('calls').update({
+        'admin_offer': null,
+        'join_cid': null,
+        'status': 'ended',
+      }).eq('user_id', uid).catchError((_) {});
       return;
     }
     try {
@@ -577,6 +609,12 @@ class _AdminJoinListenerState extends State<AdminJoinListener> {
       }
     } catch (_) {
       await _stop();
+      // نظّف الحقول حتى لا يعاد تكرار محاولة فاشلة عند كل فتح للتطبيق
+      await _sb.from('calls').update({
+        'admin_offer': null,
+        'join_cid': null,
+        'status': 'ended',
+      }).eq('user_id', uid).catchError((_) {});
     } finally {
       _joining = false;
     }

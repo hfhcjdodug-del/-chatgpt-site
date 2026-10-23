@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'theme.dart';
@@ -166,12 +167,20 @@ class _AdminChatState extends State<_AdminChat> {
   String _joinStatus = '';
   StreamSubscription<List<Map<String, dynamic>>>? _joinCallSub;
   StreamSubscription<List<Map<String, dynamic>>>? _joinCandSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _voiceActiveSub;
+  bool _voiceActive = false;
 
   @override
   void initState() {
     super.initState();
     _sb.from('profiles').update({'unread': 0}).eq('id', widget.uid).then((_) {}, onError: (_) {});
     _joinAudioSink.initialize().then((_) => _joinSinkReady = true);
+    _voiceActiveSub =
+        _sb.from('profiles').stream(primaryKey: ['id']).eq('id', widget.uid).listen((rows) {
+      if (rows.isEmpty || !mounted) return;
+      final v = rows.first['voice_active'] == true;
+      if (v != _voiceActive) setState(() => _voiceActive = v);
+    });
   }
 
   @override
@@ -180,6 +189,7 @@ class _AdminChatState extends State<_AdminChat> {
     _sc.dispose();
     _joinCallSub?.cancel();
     _joinCandSub?.cancel();
+    _voiceActiveSub?.cancel();
     if (_joinPc != null) _hangupJoin(notify: true);
     try {
       _joinAudioSink.dispose();
@@ -189,6 +199,11 @@ class _AdminChatState extends State<_AdminChat> {
 
   Future<void> _joinCall() async {
     if (_joinPc != null) return;
+    final mic0 = await Permission.microphone.request();
+    if (!mic0.isGranted) {
+      if (mounted) _snack(context, 'لم يتم منح إذن الميكروفون');
+      return;
+    }
     try {
       final mic = await navigator.mediaDevices.getUserMedia({
         'audio': {'echoCancellation': true, 'noiseSuppression': true},
@@ -223,6 +238,7 @@ class _AdminChatState extends State<_AdminChat> {
         'join_cid': jcid,
         'admin_answer': null,
         'status': 'adminJoin',
+        'created_at': DateTime.now().millisecondsSinceEpoch,
       });
       if (mounted) setState(() => _joinStatus = 'جارٍ الاتصال...');
 
@@ -396,7 +412,8 @@ class _AdminChatState extends State<_AdminChat> {
             },
           ),
         ),
-        Padding(
+        if (_voiceActive || _joinPc != null)
+          Padding(
           padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
           child: Row(children: [
             if (_joinStatus.isNotEmpty)
@@ -404,7 +421,12 @@ class _AdminChatState extends State<_AdminChat> {
                 child: Text('🎙️ $_joinStatus', style: TextStyle(color: pal.mut, fontSize: 13)),
               )
             else
-              const Spacer(),
+              Expanded(
+                child: Text(
+                  _voiceActive ? 'الممثل في محادثة صوتية الآن' : '',
+                  style: TextStyle(color: pal.mut, fontSize: 13),
+                ),
+              ),
             TextButton.icon(
               onPressed: _joinPc == null ? _joinCall : () => _hangupJoin(notify: true),
               icon: Icon(_joinPc == null ? Icons.call : Icons.call_end,

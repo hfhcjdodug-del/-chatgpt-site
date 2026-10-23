@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,20 +11,26 @@ import 'login_screen.dart';
 import 'video_call.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  // في نسخة release تظهر أخطاء البناء كمربع رمادي؛ نعرض النص بدلاً منه للتشخيص
-  ErrorWidget.builder = (FlutterErrorDetails d) => Container(
-        color: Colors.white,
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Text(
-            d.exceptionAsString(),
-            textDirection: TextDirection.ltr,
-            style: const TextStyle(color: Colors.red, fontSize: 12),
+  runZonedGuarded(() {
+    WidgetsFlutterBinding.ensureInitialized();
+    // في نسخة release تظهر أخطاء البناء كمربع رمادي؛ نعرض النص بدلاً منه للتشخيص
+    ErrorWidget.builder = (FlutterErrorDetails d) => Container(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            child: Text(
+              d.exceptionAsString(),
+              textDirection: TextDirection.ltr,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
           ),
-        ),
-      );
-  runApp(const Boot());
+        );
+    // لا نترك خطأ غير متوقع (مثلاً من WebRTC) يُسقط التطبيق بالكامل
+    FlutterError.onError = (d) => FlutterError.presentError(d);
+    runApp(const Boot());
+  }, (error, stack) {
+    // تجاهل أي خطأ غير ملتقط خارج شجرة الواجهة بدل إنهاء التطبيق
+  });
 }
 
 /// يشغّل التهيئة ويعرض شاشة انتظار أو رسالة الخطأ بدل الشاشة السوداء

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'icons.dart';
 import 'kv_store.dart';
@@ -41,7 +42,18 @@ class _VoiceScreenState extends State<VoiceScreen> with SingleTickerProviderStat
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
       ..repeat(reverse: true);
+    _setVoiceActive(true);
     _boot();
+  }
+
+  void _setVoiceActive(bool v) {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
+    Supabase.instance.client
+        .from('profiles')
+        .update({'voice_active': v})
+        .eq('id', uid)
+        .then((_) {}, onError: (_) {});
   }
 
   Future<void> _boot() async {
@@ -196,6 +208,7 @@ class _VoiceScreenState extends State<VoiceScreen> with SingleTickerProviderStat
   void dispose() {
     _active = false;
     _gen++;
+    _setVoiceActive(false);
     _pulse.dispose();
     _pager.dispose();
     try {
