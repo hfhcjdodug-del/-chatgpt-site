@@ -194,6 +194,19 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  /// يضمن وجود صف المستخدم في profiles قبل أي إدراج يعتمد عليه
+  /// (مثلاً إن حذفه المشرف من لوحة التحكم أثناء الجلسة)
+  Future<void> _ensureProfile() async {
+    try {
+      await sb.from('profiles').upsert({
+        'id': uid,
+        'name': _name,
+        'email': sb.auth.currentUser?.email ?? '',
+        'last_seen': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (_) {}
+  }
+
   // ---------------- معالجة الرسالة (نص أو صوت) ----------------
   Future<String> _process(String text, {bool voice = false, String? preset}) async {
     final cid = _convId!;
@@ -219,6 +232,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) setState(() => _waiting = _waiting > 0 ? _waiting - 1 : 0);
       }
     }
+    await _ensureProfile();
     if (_convIsNew) {
       _convIsNew = false;
       await sb.from('conversations').upsert({
@@ -229,7 +243,12 @@ class _ChatScreenState extends State<ChatScreen> {
         'last_at': now,
       });
     } else {
-      await sb.from('conversations').update({'last_at': now}).eq('id', cid);
+      // upsert بدل update: يعيد إنشاء المحادثة إن حُذفت (مثلاً مع حذف ملفه من لوحة التحكم)
+      await sb.from('conversations').upsert({
+        'id': cid,
+        'user_id': uid,
+        'last_at': now,
+      });
     }
     final hist = List<Map<String, dynamic>>.from(_msgs);
     await sb.from('messages').insert({'user_id': uid, 'conv_id': cid, 'sender': 'user', 'text': text});
