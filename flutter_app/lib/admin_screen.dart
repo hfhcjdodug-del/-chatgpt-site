@@ -167,6 +167,8 @@ class _AdminChatState extends State<_AdminChat> {
   StreamSubscription<List<Map<String, dynamic>>>? _joinCandSub;
   StreamSubscription<List<Map<String, dynamic>>>? _voiceActiveSub;
   bool _voiceActive = false;
+  bool _joinRemoteSet = false;
+  final List<RTCIceCandidate> _joinPendingCands = [];
 
   @override
   void initState() {
@@ -250,6 +252,13 @@ class _AdminChatState extends State<_AdminChat> {
           try {
             await pc.setRemoteDescription(
                 RTCSessionDescription(ans['sdp'] as String, ans['type'] as String));
+            // طبّق الآن أي مرشحات ICE وصلت وهي بالانتظار؛ تطبيقها مباشرة قبل
+            // اكتمال الرد هو ما كان يسبب خروج التطبيق فجأة دون أي خطأ ظاهر
+            _joinRemoteSet = true;
+            for (final c in _joinPendingCands) {
+              await pc.addCandidate(c).catchError((_) {});
+            }
+            _joinPendingCands.clear();
             if (mounted) setState(() => _joinStatus = 'متصل');
           } catch (_) {}
         }
@@ -266,10 +275,13 @@ class _AdminChatState extends State<_AdminChat> {
           if (r['cid']?.toString() != jcid || r['by'] != 'u') continue;
           final c = r['cand'];
           if (c is Map) {
-            pc
-                .addCandidate(RTCIceCandidate(
-                    c['candidate'] as String?, c['sdpMid'] as String?, c['sdpMLineIndex'] as int?))
-                .catchError((_) {});
+            final ice = RTCIceCandidate(
+                c['candidate'] as String?, c['sdpMid'] as String?, c['sdpMLineIndex'] as int?);
+            if (_joinRemoteSet) {
+              pc.addCandidate(ice).catchError((_) {});
+            } else {
+              _joinPendingCands.add(ice);
+            }
           }
         }
       });
@@ -296,6 +308,8 @@ class _AdminChatState extends State<_AdminChat> {
       await _joinPc?.close();
     } catch (_) {}
     _joinPc = null;
+    _joinRemoteSet = false;
+    _joinPendingCands.clear();
     try {
       _joinMic?.getTracks().forEach((t) => t.stop());
     } catch (_) {}

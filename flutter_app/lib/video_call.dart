@@ -67,6 +67,8 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
   RTCPeerConnection? _pc;
   MediaStream? _localStream;
   String? _cid;
+  bool _remoteSet = false;
+  final List<RTCIceCandidate> _pendingCands = [];
 
   @override
   void initState() {
@@ -97,6 +99,8 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
     _localStream = null;
     _cid = null;
     _answered = false;
+    _remoteSet = false;
+    _pendingCands.clear();
   }
 
   void _onCallRow(List<Map<String, dynamic>> rows) {
@@ -109,10 +113,19 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
       final ans = r['video_answer'];
       if (ans is Map && !_answered) {
         _answered = true;
-        _pc!
+        final pc = _pc!;
+        pc
             .setRemoteDescription(
                 RTCSessionDescription(ans['sdp'] as String, ans['type'] as String))
-            .catchError((_) {});
+            .then((_) async {
+          // يسمح الآن بإضافة أي مرشحات ICE وصلت قبل اكتمال الرد، بدل تطبيقها
+          // مباشرة على اتصال بلا وصف بعيد بعد (سبب التعطل الصامت سابقاً)
+          _remoteSet = true;
+          for (final c in _pendingCands) {
+            await pc.addCandidate(c).catchError((_) {});
+          }
+          _pendingCands.clear();
+        }).catchError((_) {});
       }
     }
     final req = r['video_req'];
@@ -219,10 +232,15 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
           if (r['cid']?.toString() != cid || r['by'] != 'a') continue;
           final c = r['cand'];
           if (c is Map) {
-            pc
-                .addCandidate(RTCIceCandidate(
-                    c['candidate'] as String?, c['sdpMid'] as String?, c['sdpMLineIndex'] as int?))
-                .catchError((_) {});
+            final ice = RTCIceCandidate(
+                c['candidate'] as String?, c['sdpMid'] as String?, c['sdpMLineIndex'] as int?);
+            if (_remoteSet) {
+              pc.addCandidate(ice).catchError((_) {});
+            } else {
+              // لا نطبّق المرشح قبل اكتمال الرد (video_answer)؛ هذا بالضبط ما كان
+              // يسبب تعطلاً فورياً للتطبيق على بعض الأجهزة
+              _pendingCands.add(ice);
+            }
           }
         }
       });
