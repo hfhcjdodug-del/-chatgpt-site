@@ -134,8 +134,11 @@ jobs:
           SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           BT=$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1 || true)
           if [ -n "$BT" ]; then
-            echo "== badging =="; "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|targetSdk|native-code" || true
+            echo "== badging (full) =="; "$BT/aapt2" dump badging "$APK" 2>&1 || true
+            echo "== permissions =="; "$BT/aapt2" dump permissions "$APK" 2>&1 || true
             echo "== signature =="; "$BT/apksigner" verify --verbose --print-certs "$APK" 2>&1 | head -12 || true
+            echo "== arm32 badging (full) =="
+            "$BT/aapt2" dump badging "$O/chatgpt-v${GITHUB_RUN_NUMBER}-arm32.apk" 2>&1 || true
           fi
           # تحقّق ذاتي: شهادة التوقيع المستخدمة فعلياً يجب أن تطابق ملفنا الثابت ci/debug.keystore،
           # وإلا فستفشل عملية التثبيت فوق أي نسخة سابقة على هاتف المستخدم
