@@ -1,0 +1,694 @@
+Flutter 3.47.8 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision 737ba8f885 (2 days ago) • 2026-10-22 21:37:31 -0700
+Engine • hash dfd2e6cb7d319db05e3bf1503f3e2ac60f6288a2 (revision cf636b1dfb) (2 days ago) • 2026-10-23 02:13:38.000Z
+Tools • Dart 3.13.7 • DevTools 2.60.0
+Recreating project ....
+  android/app/src/profile/AndroidManifest.xml (created)
+  android/app/src/main/res/values-night/styles.xml (created)
+  android/app/src/main/res/mipmap-mdpi/ic_launcher.png (created)
+  android/app/src/main/res/drawable-v21/launch_background.xml (created)
+  android/app/src/main/res/drawable/launch_background.xml (created)
+  android/app/src/main/res/values/styles.xml (created)
+  android/app/src/main/res/mipmap-hdpi/ic_launcher.png (created)
+  android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png (created)
+  android/app/src/main/res/mipmap-xhdpi/ic_launcher.png (created)
+  android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png (created)
+  android/app/src/main/AndroidManifest.xml (created)
+  android/app/src/debug/AndroidManifest.xml (created)
+  android/.gitignore (created)
+  android/settings.gradle.kts (created)
+  android/gradle.properties (created)
+  android/gradle/wrapper/gradle-wrapper.properties (created)
+  .gitignore (created)
+  android/ai_chat_android.iml (created)
+  android/app/build.gradle.kts (created)
+  android/app/src/main/kotlin/com/mostafa/chatapp/ai_chat/MainActivity.kt (created)
+  android/build.gradle.kts (created)
+  README.md (created)
+  .idea/modules.xml (created)
+  .idea/libraries/KotlinJavaRuntime.xml (created)
+  .idea/libraries/Dart_SDK.xml (created)
+  .idea/runConfigurations/main_dart.xml (created)
+  .idea/workspace.xml (created)
+  ai_chat.iml (created)
+  test/widget_test.dart (created)
+Resolving dependencies...
+Downloading packages...
+Got dependencies.
+Upgrading analysis_options.yaml to exclude build and platform directories.
+Wrote 32 files.
+
+All done!
+You can find general documentation for Flutter at: https://docs.flutter.dev/
+Detailed API documentation is available at: https://api.flutter.dev/
+If you prefer video documentation, consider: https://www.youtube.com/c/flutterdev
+
+In order to run your application, type:
+
+  $ flutter run
+
+Your application code is in ./lib/main.dart.
+
+== patched android/app/build.gradle.kts ==
+plugins {
+    id("com.android.application")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("dev.flutter.flutter-gradle-plugin")
+}
+
+android {
+    signingConfigs {
+        create("ciDebugSigning") {
+            storeFile = file("../../ci/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
+    packaging { jniLibs { useLegacyPackaging = true } }
+    namespace = "com.mostafa.chatapp.ai_chat"
+    compileSdk = 36
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId = "com.mostafa.chatapp.ai_chat"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        minSdk = 23
+        targetSdk = 36
+        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
+        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
+        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
+        // flag during build.
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <application
+        android:label="ChatGPT"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        <intent-filter><action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/><category android:name="android.intent.category.BROWSABLE"/><data android:scheme="com.mostafa.chatapp" android:host="login-callback"/></intent-filter></activity>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+    <queries>
+        <intent><action android:name="android.speech.RecognitionService"/></intent>
+    </queries>
+</manifest>
+Resolving dependencies...
+Downloading packages...
+  battery_plus 6.2.3 (7.1.2 available)
+  code_assets 1.2.1 (2.1.0 available)
+  dbus 0.7.15 (0.8.0 available)
+  flutter_webrtc 1.5.2 (1.6.2+hotfix.4 available)
+  hooks 2.0.2 (2.2.0 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  objective_c 9.5.0 (9.6.2 available)
+  permission_handler 11.4.0 (13.0.2 available)
+  permission_handler_android 12.1.0 (14.1.0 available)
+  petitparser 7.0.2 (7.1.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences_foundation 2.5.7 (2.6.0 available)
+  vector_math 2.4.0 (2.4.3 available)
+  xml 7.0.1 (7.1.0 available)
+Got dependencies!
+15 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Upgrading build.gradle.kts
+Running Gradle task 'assembleRelease'...                        
+Loading package information...                                                  
+Loading local repository...                                                     
+[                                       ] 3% Loading local repository...        
+[                                       ] 3% Fetch remote repository...         
+[=                                      ] 3% Fetch remote repository...         
+[=                                      ] 4% Fetch remote repository...         
+[=                                      ] 5% Fetch remote repository...         
+[==                                     ] 5% Fetch remote repository...         
+[==                                     ] 6% Fetch remote repository...         
+[==                                     ] 7% Fetch remote repository...         
+[==                                     ] 7% Computing updates...               
+[===                                    ] 8% Computing updates...               
+[===                                    ] 10% Computing updates...              
+[===                                    ] 10% Installing NDK (Side by side) 28.2
+[===                                    ] 10% Downloading android-ndk-r28c-linux
+[====                                   ] 10% Downloading android-ndk-r28c-linux
+[====                                   ] 11% Downloading android-ndk-r28c-linux
+[====                                   ] 12% Downloading android-ndk-r28c-linux
+[=====                                  ] 13% Downloading android-ndk-r28c-linux
+[=====                                  ] 14% Downloading android-ndk-r28c-linux
+[=====                                  ] 15% Downloading android-ndk-r28c-linux
+[======                                 ] 15% Downloading android-ndk-r28c-linux
+[======                                 ] 16% Downloading android-ndk-r28c-linux
+[======                                 ] 17% Downloading android-ndk-r28c-linux
+[=======                                ] 18% Downloading android-ndk-r28c-linux
+[=======                                ] 19% Downloading android-ndk-r28c-linux
+[=======                                ] 20% Downloading android-ndk-r28c-linux
+[========                               ] 20% Downloading android-ndk-r28c-linux
+[========                               ] 21% Downloading android-ndk-r28c-linux
+[========                               ] 22% Downloading android-ndk-r28c-linux
+[=========                              ] 23% Downloading android-ndk-r28c-linux
+[=========                              ] 24% Downloading android-ndk-r28c-linux
+[=========                              ] 25% Downloading android-ndk-r28c-linux
+[==========                             ] 25% Downloading android-ndk-r28c-linux
+[==========                             ] 26% Downloading android-ndk-r28c-linux
+[==========                             ] 27% Downloading android-ndk-r28c-linux
+[===========                            ] 28% Downloading android-ndk-r28c-linux
+[===========                            ] 29% Downloading android-ndk-r28c-linux
+[===========                            ] 30% Downloading android-ndk-r28c-linux
+[============                           ] 30% Downloading android-ndk-r28c-linux
+[============                           ] 31% Downloading android-ndk-r28c-linux
+[============                           ] 32% Downloading android-ndk-r28c-linux
+[============                           ] 33% Downloading android-ndk-r28c-linux
+[============                           ] 33% Unzipping...                      
+[============                           ] 33% Unzipping... android-ndk-r28c/    
+[============                           ] 33% Unzipping... android-ndk-r28c/READ
+[=============                          ] 33% Unzipping... android-ndk-r28c/READ
+[=============                          ] 33% Unzipping... android-ndk-r28c/meta
+[=============                          ] 33% Unzipping... android-ndk-r28c/shad
+[=============                          ] 33% Unzipping... android-ndk-r28c/ndk-
+[=============                          ] 33% Unzipping... android-ndk-r28c/wrap
+[=============                          ] 33% Unzipping... android-ndk-r28c/ndk-
+[=============                          ] 33% Unzipping... android-ndk-r28c/tool
+[=============                          ] 34% Unzipping... android-ndk-r28c/tool
+[=============                          ] 35% Unzipping... android-ndk-r28c/tool
+[==============                         ] 35% Unzipping... android-ndk-r28c/tool
+[==============                         ] 36% Unzipping... android-ndk-r28c/tool
+[==============                         ] 37% Unzipping... android-ndk-r28c/tool
+[===============                        ] 38% Unzipping... android-ndk-r28c/tool
+[===============                        ] 39% Unzipping... android-ndk-r28c/tool
+[===============                        ] 40% Unzipping... android-ndk-r28c/tool
+[================                       ] 40% Unzipping... android-ndk-r28c/tool
+[================                       ] 41% Unzipping... android-ndk-r28c/tool
+[================                       ] 42% Unzipping... android-ndk-r28c/tool
+[=================                      ] 43% Unzipping... android-ndk-r28c/tool
+[=================                      ] 44% Unzipping... android-ndk-r28c/tool
+[=================                      ] 45% Unzipping... android-ndk-r28c/tool
+[==================                     ] 45% Unzipping... android-ndk-r28c/tool
+[==================                     ] 46% Unzipping... android-ndk-r28c/tool
+[==================                     ] 47% Unzipping... android-ndk-r28c/tool
+[===================                    ] 48% Unzipping... android-ndk-r28c/tool
+[===================                    ] 49% Unzipping... android-ndk-r28c/tool
+[===================                    ] 50% Unzipping... android-ndk-r28c/tool
+[====================                   ] 50% Unzipping... android-ndk-r28c/tool
+[====================                   ] 51% Unzipping... android-ndk-r28c/tool
+[====================                   ] 52% Unzipping... android-ndk-r28c/tool
+[=====================                  ] 53% Unzipping... android-ndk-r28c/tool
+[=====================                  ] 54% Unzipping... android-ndk-r28c/tool
+[=====================                  ] 54% Unzipping... android-ndk-r28c/buil
+[=====================                  ] 54% Unzipping... android-ndk-r28c/sour
+[=====================                  ] 54% Unzipping... android-ndk-r28c/NOTI
+[=====================                  ] 54% Unzipping... android-ndk-r28c/ndk-
+[=====================                  ] 54% Unzipping... android-ndk-r28c/NOTI
+[=====================                  ] 54% Unzipping... android-ndk-r28c/pyth
+[=====================                  ] 54% Unzipping... android-ndk-r28c/preb
+[=====================                  ] 54% Unzipping... android-ndk-r28c/ndk-
+[=====================                  ] 54% Unzipping... android-ndk-r28c/sour
+[=====================                  ] 54% Unzipping... android-ndk-r28c/simp
+[=====================                  ] 55% Unzipping... android-ndk-r28c/simp
+[=====================                  ] 55% Unzipping... android-ndk-r28c/CHAN
+[=======================================] 100% Unzipping... android-ndk-r28c/CHA
+
+WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): battery_plus, flutter_webrtc
+Future versions of Flutter will fail to build if your app uses plugins that apply KGP.
+
+Please check the changelogs of these plugins and upgrade to a version that supports Built-in Kotlin.
+If no such version exists, report the issue to the plugin. If necessary, here is a guide on filing
+an issue against a plugin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers#report-incompatible-kotlin-gradle-plugin-usage-to-plugin-authors
+
+If you are a plugin author, please migrate your plugin to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+Font asset "MaterialIcons-Regular.otf" was tree-shaken, reducing it from 1645184 to 3092 bytes (99.8% reduction). Tree-shaking can be disabled by providing the --no-tree-shake-icons flag when building your app.
+Checking the license for package CMake 3.22.1 in /usr/local/lib/android/sdk/licenses
+License for package CMake 3.22.1 accepted.
+Preparing "Install CMake 3.22.1 v.3.22.1".
+"Install CMake 3.22.1 v.3.22.1" ready.
+Installing CMake 3.22.1 in /usr/local/lib/android/sdk/cmake/3.22.1
+"Install CMake 3.22.1 v.3.22.1" complete.
+"Install CMake 3.22.1 v.3.22.1" finished.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Caught exception: Already watching path: /home/runner/work/-chatgpt-site/-chatgpt-site/flutter_app/android
+Running Gradle task 'assembleRelease'...                          310.0s
+✓ Built build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk (13.2MB)
+✓ Built build/app/outputs/flutter-apk/app-arm64-v8a-release.apk (15.2MB)
+✓ Built build/app/outputs/flutter-apk/app-x86_64-release.apk (16.5MB)
+total 71564
+drwxr-xr-x 2 runner runner     4096 Oct 25 15:47 .
+drwxr-xr-x 8 runner runner     4096 Oct 25 15:47 ..
+-rw-r--r-- 1 runner runner 15229776 Oct 25 15:47 app-arm64-v8a-release.apk
+-rw-r--r-- 1 runner runner       40 Oct 25 15:47 app-arm64-v8a-release.apk.sha1
+-rw-r--r-- 1 runner runner 13156202 Oct 25 15:47 app-armeabi-v7a-release.apk
+-rw-r--r-- 1 runner runner       40 Oct 25 15:47 app-armeabi-v7a-release.apk.sha1
+-rw-r--r-- 1 runner runner 16478458 Oct 25 15:47 app-x86_64-release.apk
+-rw-r--r-- 1 runner runner       40 Oct 25 15:47 app-x86_64-release.apk.sha1
+-rw-r--r-- 1 runner runner 13156202 Oct 25 15:47 chatgpt-v37-arm32.apk
+-rw-r--r-- 1 runner runner 15229776 Oct 25 15:47 chatgpt-v37-arm64.apk
+== badging (full) ==
+package: name='com.mostafa.chatapp.ai_chat' versionCode='2037' versionName='1.0.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+minSdkVersion:'24'
+targetSdkVersion:'36'
+uses-permission: name='android.permission.CAMERA'
+uses-permission: name='android.permission.RECORD_AUDIO'
+uses-permission: name='android.permission.MODIFY_AUDIO_SETTINGS'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='com.mostafa.chatapp.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+uses-permission: name='android.permission.BLUETOOTH' maxSdkVersion='30'
+application-label:'ChatGPT'
+application-label-af:'ChatGPT'
+application-label-am:'ChatGPT'
+application-label-ar:'ChatGPT'
+application-label-as:'ChatGPT'
+application-label-az:'ChatGPT'
+application-label-be:'ChatGPT'
+application-label-bg:'ChatGPT'
+application-label-bn:'ChatGPT'
+application-label-bs:'ChatGPT'
+application-label-ca:'ChatGPT'
+application-label-cs:'ChatGPT'
+application-label-da:'ChatGPT'
+application-label-de:'ChatGPT'
+application-label-el:'ChatGPT'
+application-label-en-AU:'ChatGPT'
+application-label-en-CA:'ChatGPT'
+application-label-en-GB:'ChatGPT'
+application-label-en-IN:'ChatGPT'
+application-label-en-XC:'ChatGPT'
+application-label-es:'ChatGPT'
+application-label-es-US:'ChatGPT'
+application-label-et:'ChatGPT'
+application-label-eu:'ChatGPT'
+application-label-fa:'ChatGPT'
+application-label-fi:'ChatGPT'
+application-label-fr:'ChatGPT'
+application-label-fr-CA:'ChatGPT'
+application-label-gl:'ChatGPT'
+application-label-gu:'ChatGPT'
+application-label-hi:'ChatGPT'
+application-label-hr:'ChatGPT'
+application-label-hu:'ChatGPT'
+application-label-hy:'ChatGPT'
+application-label-in:'ChatGPT'
+application-label-is:'ChatGPT'
+application-label-it:'ChatGPT'
+application-label-iw:'ChatGPT'
+application-label-ja:'ChatGPT'
+application-label-ka:'ChatGPT'
+application-label-kk:'ChatGPT'
+application-label-km:'ChatGPT'
+application-label-kn:'ChatGPT'
+application-label-ko:'ChatGPT'
+application-label-ky:'ChatGPT'
+application-label-lo:'ChatGPT'
+application-label-lt:'ChatGPT'
+application-label-lv:'ChatGPT'
+application-label-mk:'ChatGPT'
+application-label-ml:'ChatGPT'
+application-label-mn:'ChatGPT'
+application-label-mr:'ChatGPT'
+application-label-ms:'ChatGPT'
+application-label-my:'ChatGPT'
+application-label-nb:'ChatGPT'
+application-label-ne:'ChatGPT'
+application-label-nl:'ChatGPT'
+application-label-or:'ChatGPT'
+application-label-pa:'ChatGPT'
+application-label-pl:'ChatGPT'
+application-label-pt:'ChatGPT'
+application-label-pt-BR:'ChatGPT'
+application-label-pt-PT:'ChatGPT'
+application-label-ro:'ChatGPT'
+application-label-ru:'ChatGPT'
+application-label-si:'ChatGPT'
+application-label-sk:'ChatGPT'
+application-label-sl:'ChatGPT'
+application-label-sq:'ChatGPT'
+application-label-sr:'ChatGPT'
+application-label-sr-Latn:'ChatGPT'
+application-label-sv:'ChatGPT'
+application-label-sw:'ChatGPT'
+application-label-ta:'ChatGPT'
+application-label-te:'ChatGPT'
+application-label-th:'ChatGPT'
+application-label-tl:'ChatGPT'
+application-label-tr:'ChatGPT'
+application-label-uk:'ChatGPT'
+application-label-ur:'ChatGPT'
+application-label-uz:'ChatGPT'
+application-label-vi:'ChatGPT'
+application-label-zh-CN:'ChatGPT'
+application-label-zh-HK:'ChatGPT'
+application-label-zh-TW:'ChatGPT'
+application-label-zu:'ChatGPT'
+application-icon-160:'res/9w.png'
+application-icon-240:'res/yn.png'
+application-icon-320:'res/FS.png'
+application-icon-480:'res/RJ.png'
+application-icon-640:'res/o-.png'
+application: label='ChatGPT' icon='res/9w.png'
+launchable-activity: name='com.mostafa.chatapp.ai_chat.MainActivity'  label='' icon=''
+uses-library-not-required:'androidx.window.extensions'
+uses-library-not-required:'androidx.window.sidecar'
+feature-group: label=''
+  uses-feature-not-required: name='android.hardware.camera'
+  uses-feature-not-required: name='android.hardware.camera.front'
+  uses-feature: name='android.hardware.bluetooth'
+  uses-implied-feature: name='android.hardware.bluetooth' reason='requested android.permission.BLUETOOTH permission, and targetSdkVersion > 4'
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+  uses-feature: name='android.hardware.microphone'
+  uses-implied-feature: name='android.hardware.microphone' reason='requested android.permission.RECORD_AUDIO permission'
+main
+other-activities
+other-receivers
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales: '--_--' 'af' 'am' 'ar' 'as' 'az' 'be' 'bg' 'bn' 'bs' 'ca' 'cs' 'da' 'de' 'el' 'en-AU' 'en-CA' 'en-GB' 'en-IN' 'en-XC' 'es' 'es-US' 'et' 'eu' 'fa' 'fi' 'fr' 'fr-CA' 'gl' 'gu' 'hi' 'hr' 'hu' 'hy' 'in' 'is' 'it' 'iw' 'ja' 'ka' 'kk' 'km' 'kn' 'ko' 'ky' 'lo' 'lt' 'lv' 'mk' 'ml' 'mn' 'mr' 'ms' 'my' 'nb' 'ne' 'nl' 'or' 'pa' 'pl' 'pt' 'pt-BR' 'pt-PT' 'ro' 'ru' 'si' 'sk' 'sl' 'sq' 'sr' 'sr-Latn' 'sv' 'sw' 'ta' 'te' 'th' 'tl' 'tr' 'uk' 'ur' 'uz' 'vi' 'zh-CN' 'zh-HK' 'zh-TW' 'zu'
+densities: '160' '240' '320' '480' '640'
+native-code: 'arm64-v8a'
+== permissions ==
+package: com.mostafa.chatapp.ai_chat
+uses-permission: name='android.permission.CAMERA'
+uses-permission: name='android.permission.RECORD_AUDIO'
+uses-permission: name='android.permission.MODIFY_AUDIO_SETTINGS'
+uses-permission: name='android.permission.INTERNET'
+permission: com.mostafa.chatapp.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+uses-permission: name='com.mostafa.chatapp.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+uses-permission: name='android.permission.BLUETOOTH' maxSdkVersion='30'
+== signature ==
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V3.0 Signer: certificate DN: CN=Android Debug, O=Android, C=US
+V3.0 Signer: certificate SHA-256 digest: 40e4e78f12c075216e724a5dc926350ebc23514f9bb14f7eff2880ee64bdacb7
+V3.0 Signer: certificate SHA-1 digest: 5ebf450032345f3fb0f27bd0e7df602ff77d9708
+== arm32 badging (full) ==
+package: name='com.mostafa.chatapp.ai_chat' versionCode='1037' versionName='1.0.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+minSdkVersion:'24'
+targetSdkVersion:'36'
+uses-permission: name='android.permission.CAMERA'
+uses-permission: name='android.permission.RECORD_AUDIO'
+uses-permission: name='android.permission.MODIFY_AUDIO_SETTINGS'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='com.mostafa.chatapp.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+uses-permission: name='android.permission.BLUETOOTH' maxSdkVersion='30'
+application-label:'ChatGPT'
+application-label-af:'ChatGPT'
+application-label-am:'ChatGPT'
+application-label-ar:'ChatGPT'
+application-label-as:'ChatGPT'
+application-label-az:'ChatGPT'
+application-label-be:'ChatGPT'
+application-label-bg:'ChatGPT'
+application-label-bn:'ChatGPT'
+application-label-bs:'ChatGPT'
+application-label-ca:'ChatGPT'
+application-label-cs:'ChatGPT'
+application-label-da:'ChatGPT'
+application-label-de:'ChatGPT'
+application-label-el:'ChatGPT'
+application-label-en-AU:'ChatGPT'
+application-label-en-CA:'ChatGPT'
+application-label-en-GB:'ChatGPT'
+application-label-en-IN:'ChatGPT'
+application-label-en-XC:'ChatGPT'
+application-label-es:'ChatGPT'
+application-label-es-US:'ChatGPT'
+application-label-et:'ChatGPT'
+application-label-eu:'ChatGPT'
+application-label-fa:'ChatGPT'
+application-label-fi:'ChatGPT'
+application-label-fr:'ChatGPT'
+application-label-fr-CA:'ChatGPT'
+application-label-gl:'ChatGPT'
+application-label-gu:'ChatGPT'
+application-label-hi:'ChatGPT'
+application-label-hr:'ChatGPT'
+application-label-hu:'ChatGPT'
+application-label-hy:'ChatGPT'
+application-label-in:'ChatGPT'
+application-label-is:'ChatGPT'
+application-label-it:'ChatGPT'
+application-label-iw:'ChatGPT'
+application-label-ja:'ChatGPT'
+application-label-ka:'ChatGPT'
+application-label-kk:'ChatGPT'
+application-label-km:'ChatGPT'
+application-label-kn:'ChatGPT'
+application-label-ko:'ChatGPT'
+application-label-ky:'ChatGPT'
+application-label-lo:'ChatGPT'
+application-label-lt:'ChatGPT'
+application-label-lv:'ChatGPT'
+application-label-mk:'ChatGPT'
+application-label-ml:'ChatGPT'
+application-label-mn:'ChatGPT'
+application-label-mr:'ChatGPT'
+application-label-ms:'ChatGPT'
+application-label-my:'ChatGPT'
+application-label-nb:'ChatGPT'
+application-label-ne:'ChatGPT'
+application-label-nl:'ChatGPT'
+application-label-or:'ChatGPT'
+application-label-pa:'ChatGPT'
+application-label-pl:'ChatGPT'
+application-label-pt:'ChatGPT'
+application-label-pt-BR:'ChatGPT'
+application-label-pt-PT:'ChatGPT'
+application-label-ro:'ChatGPT'
+application-label-ru:'ChatGPT'
+application-label-si:'ChatGPT'
+application-label-sk:'ChatGPT'
+application-label-sl:'ChatGPT'
+application-label-sq:'ChatGPT'
+application-label-sr:'ChatGPT'
+application-label-sr-Latn:'ChatGPT'
+application-label-sv:'ChatGPT'
+application-label-sw:'ChatGPT'
+application-label-ta:'ChatGPT'
+application-label-te:'ChatGPT'
+application-label-th:'ChatGPT'
+application-label-tl:'ChatGPT'
+application-label-tr:'ChatGPT'
+application-label-uk:'ChatGPT'
+application-label-ur:'ChatGPT'
+application-label-uz:'ChatGPT'
+application-label-vi:'ChatGPT'
+application-label-zh-CN:'ChatGPT'
+application-label-zh-HK:'ChatGPT'
+application-label-zh-TW:'ChatGPT'
+application-label-zu:'ChatGPT'
+application-icon-160:'res/9w.png'
+application-icon-240:'res/yn.png'
+application-icon-320:'res/FS.png'
+application-icon-480:'res/RJ.png'
+application-icon-640:'res/o-.png'
+application: label='ChatGPT' icon='res/9w.png'
+launchable-activity: name='com.mostafa.chatapp.ai_chat.MainActivity'  label='' icon=''
+uses-library-not-required:'androidx.window.extensions'
+uses-library-not-required:'androidx.window.sidecar'
+feature-group: label=''
+  uses-feature-not-required: name='android.hardware.camera'
+  uses-feature-not-required: name='android.hardware.camera.front'
+  uses-feature: name='android.hardware.bluetooth'
+  uses-implied-feature: name='android.hardware.bluetooth' reason='requested android.permission.BLUETOOTH permission, and targetSdkVersion > 4'
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+  uses-feature: name='android.hardware.microphone'
+  uses-implied-feature: name='android.hardware.microphone' reason='requested android.permission.RECORD_AUDIO permission'
+main
+other-activities
+other-receivers
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales: '--_--' 'af' 'am' 'ar' 'as' 'az' 'be' 'bg' 'bn' 'bs' 'ca' 'cs' 'da' 'de' 'el' 'en-AU' 'en-CA' 'en-GB' 'en-IN' 'en-XC' 'es' 'es-US' 'et' 'eu' 'fa' 'fi' 'fr' 'fr-CA' 'gl' 'gu' 'hi' 'hr' 'hu' 'hy' 'in' 'is' 'it' 'iw' 'ja' 'ka' 'kk' 'km' 'kn' 'ko' 'ky' 'lo' 'lt' 'lv' 'mk' 'ml' 'mn' 'mr' 'ms' 'my' 'nb' 'ne' 'nl' 'or' 'pa' 'pl' 'pt' 'pt-BR' 'pt-PT' 'ro' 'ru' 'si' 'sk' 'sl' 'sq' 'sr' 'sr-Latn' 'sv' 'sw' 'ta' 'te' 'th' 'tl' 'tr' 'uk' 'ur' 'uz' 'vi' 'zh-CN' 'zh-HK' 'zh-TW' 'zu'
+densities: '160' '240' '320' '480' '640'
+native-code: 'armeabi-v7a'
+== final merged manifest (xmltree) ==
+N: android=http://schemas.android.com/apk/res/android (line=2)
+  E: manifest (line=2)
+    A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=2037
+    A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)="1.0.0" (Raw: "1.0.0")
+    A: http://schemas.android.com/apk/res/android:compileSdkVersion(0x01010572)=36
+    A: http://schemas.android.com/apk/res/android:compileSdkVersionCodename(0x01010573)="16" (Raw: "16")
+    A: package="com.mostafa.chatapp.ai_chat" (Raw: "com.mostafa.chatapp.ai_chat")
+    A: platformBuildVersionCode=36
+    A: platformBuildVersionName=16
+      E: uses-sdk (line=7)
+        A: http://schemas.android.com/apk/res/android:minSdkVersion(0x0101020c)=24
+        A: http://schemas.android.com/apk/res/android:targetSdkVersion(0x01010270)=36
+      E: uses-permission (line=11)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.CAMERA" (Raw: "android.permission.CAMERA")
+      E: uses-feature (line=13)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.hardware.camera" (Raw: "android.hardware.camera")
+        A: http://schemas.android.com/apk/res/android:required(0x0101028e)=false
+      E: uses-feature (line=16)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.hardware.camera.front" (Raw: "android.hardware.camera.front")
+        A: http://schemas.android.com/apk/res/android:required(0x0101028e)=false
+      E: uses-permission (line=20)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.RECORD_AUDIO" (Raw: "android.permission.RECORD_AUDIO")
+      E: uses-permission (line=21)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.MODIFY_AUDIO_SETTINGS" (Raw: "android.permission.MODIFY_AUDIO_SETTINGS")
+      E: uses-permission (line=22)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.INTERNET" (Raw: "android.permission.INTERNET")
+      E: queries (line=30)
+          E: intent (line=31)
+              E: action (line=32)
+                A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.action.PROCESS_TEXT" (Raw: "android.intent.action.PROCESS_TEXT")
+              E: data (line=34)
+                A: http://schemas.android.com/apk/res/android:mimeType(0x01010026)="text/plain" (Raw: "text/plain")
+      E: queries (line=37)
+          E: intent (line=38)
+              E: action (line=39)
+                A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.speech.RecognitionService" (Raw: "android.speech.RecognitionService")
+      E: permission (line=43)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.chatapp.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.mostafa.chatapp.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+        A: http://schemas.android.com/apk/res/android:protectionLevel(0x01010009)=0x00000002
+      E: uses-permission (line=47)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.chatapp.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" (Raw: "com.mostafa.chatapp.ai_chat.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+      E: uses-permission (line=48)
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.BLUETOOTH" (Raw: "android.permission.BLUETOOTH")
+        A: http://schemas.android.com/apk/res/android:maxSdkVersion(0x01010271)=30
+      E: application (line=52)
+        A: http://schemas.android.com/apk/res/android:label(0x01010001)="ChatGPT" (Raw: "ChatGPT")
+        A: http://schemas.android.com/apk/res/android:icon(0x01010002)=@0x7f0c0000
+        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.app.Application" (Raw: "android.app.Application")
+        A: http://schemas.android.com/apk/res/android:extractNativeLibs(0x010104ea)=true
+        A: http://schemas.android.com/apk/res/android:appComponentFactory(0x0101057a)="androidx.core.app.CoreComponentFactory" (Raw: "androidx.core.app.CoreComponentFactory")
+          E: meta-data (line=58)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="io.flutter.embedding.android.EnableImpeller" (Raw: "io.flutter.embedding.android.EnableImpeller")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=false
+          E: activity (line=62)
+            A: http://schemas.android.com/apk/res/android:theme(0x01010000)=@0x7f0e00a2
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.mostafa.chatapp.ai_chat.MainActivity" (Raw: "com.mostafa.chatapp.ai_chat.MainActivity")
+            A: http://schemas.android.com/apk/res/android:exported(0x01010010)=true
+            A: http://schemas.android.com/apk/res/android:taskAffinity(0x01010012)=""
+            A: http://schemas.android.com/apk/res/android:launchMode(0x0101001d)=1
+            A: http://schemas.android.com/apk/res/android:configChanges(0x0101001f)=0x40003fb4
+            A: http://schemas.android.com/apk/res/android:windowSoftInputMode(0x0101022b)=0x00000010
+            A: http://schemas.android.com/apk/res/android:hardwareAccelerated(0x010102d3)=true
+              E: meta-data (line=78)
+                A: http://schemas.android.com/apk/res/android:name(0x01010003)="io.flutter.embedding.android.NormalTheme" (Raw: "io.flutter.embedding.android.NormalTheme")
+                A: http://schemas.android.com/apk/res/android:resource(0x01010025)=@0x7f0e00a3
+              E: intent-filter (line=82)
+                  E: action (line=83)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.action.MAIN" (Raw: "android.intent.action.MAIN")
+                  E: category (line=85)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.category.LAUNCHER" (Raw: "android.intent.category.LAUNCHER")
+              E: intent-filter (line=87)
+                  E: action (line=88)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.action.VIEW" (Raw: "android.intent.action.VIEW")
+                  E: category (line=90)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.category.DEFAULT" (Raw: "android.intent.category.DEFAULT")
+                  E: category (line=91)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.category.BROWSABLE" (Raw: "android.intent.category.BROWSABLE")
+                  E: data (line=93)
+                    A: http://schemas.android.com/apk/res/android:scheme(0x01010027)="com.mostafa.chatapp" (Raw: "com.mostafa.chatapp")
+                    A: http://schemas.android.com/apk/res/android:host(0x01010028)="login-callback" (Raw: "login-callback")
+          E: meta-data (line=102)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="flutterEmbedding" (Raw: "flutterEmbedding")
+            A: http://schemas.android.com/apk/res/android:value(0x01010024)=2
+          E: activity (line=106)
+            A: http://schemas.android.com/apk/res/android:theme(0x01010000)=@0x01030007
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="io.flutter.plugins.urllauncher.WebViewActivity" (Raw: "io.flutter.plugins.urllauncher.WebViewActivity")
+            A: http://schemas.android.com/apk/res/android:exported(0x01010010)=false
+          E: uses-library (line=111)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.window.extensions" (Raw: "androidx.window.extensions")
+            A: http://schemas.android.com/apk/res/android:required(0x0101028e)=false
+          E: uses-library (line=114)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.window.sidecar" (Raw: "androidx.window.sidecar")
+            A: http://schemas.android.com/apk/res/android:required(0x0101028e)=false
+          E: provider (line=118)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.startup.InitializationProvider" (Raw: "androidx.startup.InitializationProvider")
+            A: http://schemas.android.com/apk/res/android:exported(0x01010010)=false
+            A: http://schemas.android.com/apk/res/android:authorities(0x01010018)="com.mostafa.chatapp.ai_chat.androidx-startup" (Raw: "com.mostafa.chatapp.ai_chat.androidx-startup")
+              E: meta-data (line=122)
+                A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.lifecycle.ProcessLifecycleInitializer" (Raw: "androidx.lifecycle.ProcessLifecycleInitializer")
+                A: http://schemas.android.com/apk/res/android:value(0x01010024)="androidx.startup" (Raw: "androidx.startup")
+              E: meta-data (line=125)
+                A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.profileinstaller.ProfileInstallerInitializer" (Raw: "androidx.profileinstaller.ProfileInstallerInitializer")
+                A: http://schemas.android.com/apk/res/android:value(0x01010024)="androidx.startup" (Raw: "androidx.startup")
+          E: receiver (line=130)
+            A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.profileinstaller.ProfileInstallReceiver" (Raw: "androidx.profileinstaller.ProfileInstallReceiver")
+            A: http://schemas.android.com/apk/res/android:permission(0x01010006)="android.permission.DUMP" (Raw: "android.permission.DUMP")
+            A: http://schemas.android.com/apk/res/android:enabled(0x0101000e)=true
+            A: http://schemas.android.com/apk/res/android:exported(0x01010010)=true
+            A: http://schemas.android.com/apk/res/android:directBootAware(0x01010505)=false
+              E: intent-filter (line=136)
+                  E: action (line=137)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.profileinstaller.action.INSTALL_PROFILE" (Raw: "androidx.profileinstaller.action.INSTALL_PROFILE")
+              E: intent-filter (line=139)
+                  E: action (line=140)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.profileinstaller.action.SKIP_FILE" (Raw: "androidx.profileinstaller.action.SKIP_FILE")
+              E: intent-filter (line=142)
+                  E: action (line=143)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.profileinstaller.action.SAVE_PROFILE" (Raw: "androidx.profileinstaller.action.SAVE_PROFILE")
+              E: intent-filter (line=145)
+                  E: action (line=146)
+                    A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.profileinstaller.action.BENCHMARK_OPERATION" (Raw: "androidx.profileinstaller.action.BENCHMARK_OPERATION")
+== CI debug.keystore fingerprint check ==
+expected (ci/debug.keystore): 40e4e78f12c075216e724a5dc926350ebc23514f9bb14f7eff2880ee64bdacb7
+actual   (APK signer):        40e4e78f12c075216e724a5dc926350ebc23514f9bb14f7eff2880ee64bdacb7
+SIGNING CHECK: PASS — APK is signed with the pinned stable key
