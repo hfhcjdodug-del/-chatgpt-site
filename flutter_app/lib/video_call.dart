@@ -185,9 +185,16 @@ class _CameraConsentListenerState extends State<CameraConsentListener> {
       }
       MediaStream stream;
       try {
+        // دقة متواضعة صراحة: بعض شرائح MediaTek الرخيصة تتعطل (عطل نظام، لا يُلتقط
+        // بـ try/catch) عند طلب دقة/معدل إطارات افتراضي أعلى مما تدعمه كاميرا الواجهة
         stream = await navigator.mediaDevices.getUserMedia({
           'audio': false,
-          'video': {'facingMode': 'user'},
+          'video': {
+            'facingMode': 'user',
+            'width': {'ideal': 640},
+            'height': {'ideal': 480},
+            'frameRate': {'ideal': 15},
+          },
         });
       } catch (_) {
         // بعض الأجهزة لا تدعم قيد facingMode؛ نجرّب الكاميرا الافتراضية
