@@ -281,11 +281,15 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
   String _status = 'اطلب فتح الكاميرا للبدء';
   bool _connected = false;
   int? _battery;
+  bool _rendererReady = false;
 
   @override
   void initState() {
     super.initState();
-    _renderer.initialize();
+    // كان يُستدعى بدون انتظار أو حماية من الخطأ داخل initState، فأي استثناء قابل
+    // للالتقاط من تهيئة عارض الفيديو كان يسبب خروج الشاشة فوراً بلا أي رسالة.
+    // ننقله لدالة async محمية بـ try/catch، ونؤخر أي استخدام للعارض حتى تنجح.
+    _initRenderer();
     _callSub = _sb
         .from('calls')
         .stream(primaryKey: ['user_id'])
@@ -298,17 +302,37 @@ class _AdminCameraScreenState extends State<AdminCameraScreen> {
     });
   }
 
+  Future<void> _initRenderer() async {
+    try {
+      await _renderer.initialize();
+      if (mounted) setState(() => _rendererReady = true);
+    } catch (e) {
+      if (mounted) {
+        showErrorDialog(context, 'تعذر تهيئة عارض الفيديو', e);
+        setState(() => _status = 'تعذر تهيئة الكاميرا على هذا الجهاز');
+      }
+    }
+  }
+
   @override
   void dispose() {
     _callSub?.cancel();
     _candSub?.cancel();
     _profSub?.cancel();
     _hangup(notify: true);
-    _renderer.dispose();
+    if (_rendererReady) {
+      try {
+        _renderer.dispose();
+      } catch (_) {}
+    }
     super.dispose();
   }
 
   Future<void> _requestOpen() async {
+    if (!_rendererReady) {
+      showErrorDialog(context, 'تعذر فتح الكاميرا', 'عارض الفيديو غير جاهز على هذا الجهاز بعد');
+      return;
+    }
     try {
       await _sb.from('calls').upsert({
         'user_id': widget.uid,
