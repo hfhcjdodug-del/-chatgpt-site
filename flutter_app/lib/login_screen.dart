@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart' show LaunchMode;
 
 import 'kv_store.dart';
 
@@ -30,6 +31,11 @@ class _LoginScreenState extends State<LoginScreen> {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: 'com.mostafa.chatapp://login-callback',
+        // صراحةً نفتح متصفح خارجي بمهمّة (task) منفصلة تماماً عن تطبيقنا، بدل
+        // العرض الضمني داخل نفس المهمة. بدون هذا كانت صفحة تسجيل الدخول تبقى
+        // عالقة بتاريخ شاشات تطبيقنا، وترجع تظهر من تلقاء نفسها عند أي استرجاع
+        // للمهمة (مثلاً بعد أي عطل خفيف بالخلفية غير مرتبط بها إطلاقاً).
+        authScreenLaunchMode: LaunchMode.externalApplication,
       );
     } catch (e) {
       if (mounted) setState(() => _err = 'تعذر الدخول عبر Google: $e');
