@@ -121,6 +121,12 @@ select option{background:#121726;color:#fff}
 .hgrid b{font-weight:700;outline:none;min-width:30px;text-align:left}
 .hgrid b:focus{background:rgba(56,225,255,.15);border-radius:4px}
 .hint{font-size:11px;color:var(--mu);text-align:center}
+/* عمودا الكاميرا */
+.hud-cols{display:flex;gap:8px;align-items:flex-start}
+.hud-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.hud-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.hud-right .hgrid{grid-template-columns:1fr}
+.hud-right .hgrid div{border-bottom:1px dashed rgba(255,255,255,.08)}
 /* ===== سطح المكتب ===== */
 :root{--top-h:52px;--side-w:64px;--cam-w:380px}
 @media(min-width:900px){
@@ -389,14 +395,22 @@ select option{background:#121726;color:#fff}
 <video id="ocShareVid" autoplay playsinline muted style="flex:1;width:100%;object-fit:cover;transform:scaleX(-1)"></video></div>
 </div><div id="vidBar"><div class="vwrap"><video id="rVideo" autoplay playsinline></video><canvas id="hudCv"></canvas><div class="scan"></div></div>
 <div id="hudPanel">
-<div class="hh"><span>① Face Analysis</span><span id="hudTag">● LIVE</span></div>
-<div class="hcrops" id="hudCrops"><div class="hcrop"><canvas id="hcEye"></canvas><span>EYE</span></div><div class="hcrop"><canvas id="hcMouth"></canvas><span>MOUTH</span></div><div class="hcrop"><canvas id="hcNose"></canvas><span>NOSE</span></div></div>
-<div class="hbox" id="hudEmo"></div>
-<div class="hh"><span>② Full Profile</span></div>
-<div class="hbox"><div class="hgrid" id="hudInfo"></div><div style="height:8px"></div><div id="hudSt"></div><div class="hbatt" id="hudBatt"></div></div>
-<div class="hint">Tap any value in Basic Info to edit it</div>
-<button id="termBtn">&gt;_ Terminal</button>
-<div id="termBox"><div id="termOut"></div><input id="termIn" placeholder="type something..." autocomplete="off"></div>
+<div class="hud-cols">
+  <!-- العمود الأيسر: الوجه والمشاعر -->
+  <div class="hud-left">
+    <div class="hh"><span>① Face</span><span id="hudTag">● LIVE</span></div>
+    <div class="hcrops" id="hudCrops"><div class="hcrop"><canvas id="hcEye"></canvas><span>EYE</span></div><div class="hcrop"><canvas id="hcMouth"></canvas><span>MOUTH</span></div><div class="hcrop"><canvas id="hcNose"></canvas><span>NOSE</span></div></div>
+    <div class="hbox" id="hudEmo"></div>
+  </div>
+  <!-- العمود الأيمن: الحالة والترمينال -->
+  <div class="hud-right">
+    <div class="hh"><span>② State</span></div>
+    <div class="hbox" style="padding:8px"><div class="hgrid" id="hudInfo"></div><div style="height:6px"></div><div id="hudSt"></div><div class="hbatt" id="hudBatt"></div></div>
+    <button id="termBtn">&gt;_ Terminal</button>
+    <div id="termBox"><div id="termOut"></div><input id="termIn" placeholder="type command..." autocomplete="off"></div>
+  </div>
+</div>
+<div class="hint">Tap any value to edit • Battery from actor device</div>
 </div>
 <div class="vst" id="vidSt"></div><button class="btn red" id="vidEnd">إنهاء مكالمة الفيديو</button></div>
 <script type="module">
