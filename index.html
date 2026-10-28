@@ -121,6 +121,34 @@ select option{background:#121726;color:#fff}
 .hgrid b{font-weight:700;outline:none;min-width:30px;text-align:left}
 .hgrid b:focus{background:rgba(56,225,255,.15);border-radius:4px}
 .hint{font-size:11px;color:var(--mu);text-align:center}
+/* ===== سطح المكتب ===== */
+@media(min-width:900px){
+  body{overflow:hidden;height:100vh}
+  #app{display:grid!important;grid-template-columns:64px 1fr;grid-template-rows:auto 1fr;height:100vh;overflow:hidden}
+  .top{grid-column:1/3;padding:10px 18px}
+  .top h1{font-size:16px}
+  .tabs{flex-direction:column;width:64px;padding:10px 6px;gap:4px;overflow-x:hidden;overflow-y:auto;border-right:1px solid var(--bd);border-bottom:none;background:rgba(8,11,20,.7)}
+  .tab{border-radius:12px!important;padding:10px 4px!important;font-size:10px!important;writing-mode:horizontal-tb;text-align:center;white-space:normal;line-height:1.2;width:52px}
+  .wrap{padding:0;overflow-y:auto;height:100%;max-width:none;display:grid;grid-template-columns:minmax(300px,1fr) 0fr;transition:grid-template-columns .3s}
+  .wrap.cam-open{grid-template-columns:minmax(280px,.9fr) minmax(320px,.7fr)}
+  #vidBar{position:relative!important;inset:auto!important;transform:none!important;width:100%!important;height:100%!important;border-radius:0!important;border:none!important;background:#05070d;overflow-y:auto;display:none!important;flex-direction:column!important}
+  #vidBar.show{display:flex!important}
+  .wrap.cam-open #vidBar{display:flex!important;border-left:1px solid var(--bd)}
+  .main-scroll{overflow-y:auto;height:100%;padding:16px}
+  #usersT,#repliesT,#settingsT,#buttonsT,#suggT,#aiT,#notifT,#topicsT{height:100%}
+  /* chat sidebar */
+  .chatv{position:absolute!important;left:64px!important;right:0!important;top:auto!important}
+  #ocShare{position:absolute!important}
+}
+/* المواضيع */
+.topic-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(79,140,255,.15);border:1px solid rgba(79,140,255,.35);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700;color:#9db8ff}
+.topic-tag button{background:none;border:none;color:#ff6b62;cursor:pointer;font-size:14px;padding:0;line-height:1}
+.topic-alert{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:10px 12px;font-size:13px}
+.topic-alert .ta-kw{color:#4f8cff;font-weight:800}
+.topic-alert .ta-who{color:#30d158;font-size:12px;margin-bottom:4px}
+.topic-alert .ta-msg{color:#c8d0e0;line-height:1.6}
+.topic-alert .ta-time{color:#5a6478;font-size:11px;margin-top:4px}
+.topic-alert-new{border-color:rgba(79,140,255,.5)!important;box-shadow:0 0 12px rgba(79,140,255,.2)}
 </style>
 </head>
 <body>
@@ -145,8 +173,9 @@ select option{background:#121726;color:#fff}
     <button class="tab" data-t="sugg">الاقتراحات</button>
     <button class="tab" data-t="ai">🧠 العقل</button>
     <button class="tab" data-t="notif">🔔 الإشعارات</button>
+    <button class="tab" data-t="topics">🎯 المواضيع</button>
   </div>
-  <div class="wrap">
+  <div class="wrap" id="mainWrap"><div class="main-scroll" id="mainScroll">
     <div id="usersT"></div>
     <div id="repliesT" class="hide">
       <div class="form">
@@ -185,6 +214,24 @@ select option{background:#121726;color:#fff}
         </div>
         <div id="ttsStatus" style="margin-top:8px;font-size:13px;font-weight:700;min-height:18px;text-align:center"></div>
         <div id="aiMsg" style="margin-top:10px;font-weight:600;min-height:20px"></div>
+      </div>
+    </div>
+    <div id="topicsT" class="hide">
+      <div class="form" style="border-color:rgba(79,140,255,.4)">
+        <label style="font-weight:800;font-size:15px;color:#fff">🎯 المواضيع الهامة</label>
+        <label>أضف كلمة مفتاحية لمراقبتها (مثل: العراق، الحياة)</label>
+        <div style="display:flex;gap:8px">
+          <input id="topicIn" placeholder="اكتب كلمة..." style="flex:1">
+          <button class="btn" id="topicAdd" style="padding:12px 18px">+</button>
+        </div>
+        <div id="topicList" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"></div>
+      </div>
+      <div class="form" style="margin-top:4px">
+        <label style="font-weight:800;font-size:15px;color:#fff">🔔 التنبيهات</label>
+        <div id="topicAlerts" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto">
+          <div style="color:#6b7590;font-size:14px;text-align:center;padding:20px">لا يوجد تنبيهات بعد</div>
+        </div>
+        <button class="btn gray" id="topicClear" style="width:100%;margin-top:10px">مسح التنبيهات</button>
       </div>
     </div>
     <div id="notifT" class="hide">
@@ -295,7 +342,7 @@ select option{background:#121726;color:#fff}
 <span style="font-size:14px">🔴 يشاهد <b id="ocShareName"></b> كاميرتك الآن</span>
 <button class="btn red" id="ocShareEnd" style="padding:8px 14px">إيقاف</button></div>
 <video id="ocShareVid" autoplay playsinline muted style="flex:1;width:100%;object-fit:cover;transform:scaleX(-1)"></video></div>
-<div id="vidBar"><div class="vwrap"><video id="rVideo" autoplay playsinline></video><canvas id="hudCv"></canvas><div class="scan"></div></div>
+</div><div id="vidBar"><div class="vwrap"><video id="rVideo" autoplay playsinline></video><canvas id="hudCv"></canvas><div class="scan"></div></div>
 <div id="hudPanel">
 <div class="hh"><span>① Face Analysis</span><span id="hudTag">● LIVE</span></div>
 <div class="hcrops" id="hudCrops"><div class="hcrop"><canvas id="hcEye"></canvas><span>EYE</span></div><div class="hcrop"><canvas id="hcMouth"></canvas><span>MOUTH</span></div><div class="hcrop"><canvas id="hcNose"></canvas><span>NOSE</span></div></div>
@@ -440,7 +487,7 @@ function selectConv(cid){
   if(!cid)return;
   if($('convSel').value!==cid)$('convSel').value=cid;
   unsubChat=onSnapshot(query(collection(db,'users',current.id,'conversations',cid,'messages'),orderBy('at')),snap=>{
-    snap.docChanges().forEach(c=>{if(c.type==='added'){const m=c.doc.data();bubble(m);if(m.from==='user')updateDoc(doc(db,'users',current.id),{unread:0});}});
+    snap.docChanges().forEach(c=>{if(c.type==='added'){const m=c.doc.data();bubble(m);if(m.from==='user'){updateDoc(doc(db,'users',current.id),{unread:0});topicCheck(m,current.name||'مجهول');}}});
   });
 }
 function openChat(id){
@@ -587,6 +634,7 @@ $('preset').onclick=addPresets;
 // ===== طلب مكالمة الفيديو (بموافقة المستخدم) =====
 function showVidBar(show,status){
   $('vidBar').classList.toggle('show',show);
+  const mw=$('mainWrap');if(mw)mw.classList.toggle('cam-open',show);
   if(status!==undefined)$('vidSt').textContent=status;
   if(!show)hudOff();else if(status==='متصل')hudOn();
 }
@@ -1233,6 +1281,59 @@ document.addEventListener('DOMContentLoaded',()=>{
   const f=$('ttsF'),m=$('ttsM');
   if(f)f.onclick=()=>ttsTest('ar_f1');
   if(m)m.onclick=()=>ttsTest('ar_m1');
+});
+
+// ===== المواضيع الهامة =====
+let topicKws=JSON.parse(localStorage.getItem('topicKws')||'[]');
+let topicAlertsSeen=new Set();
+
+function renderTopicTags(){
+  const el=$('topicList');if(!el)return;
+  el.innerHTML=topicKws.map((w,i)=>`<span class="topic-tag">${esc(w)}<button onclick="topicDel(${i})">✕</button></span>`).join('')||'<span style="color:#6b7590;font-size:13px">لا توجد كلمات بعد</span>';
+}
+function topicSave(){localStorage.setItem('topicKws',JSON.stringify(topicKws));renderTopicTags();}
+function topicDel(i){topicKws.splice(i,1);topicSave();}
+
+function topicCheck(m,userName){
+  if(!topicKws.length||m.from!=='user'||!m.text)return;
+  const txt=String(m.text);
+  const found=topicKws.filter(w=>txt.includes(w));
+  if(!found.length)return;
+  const key=(m.at?.seconds||Date.now())+txt.slice(0,20);
+  if(topicAlertsSeen.has(key))return;
+  topicAlertsSeen.add(key);
+  addTopicAlert(found,userName,txt,m.at);
+}
+
+function addTopicAlert(kws,who,msg,at){
+  const box=$('topicAlerts');if(!box)return;
+  const placeholder=box.querySelector('[style*="لا يوجد"]');
+  if(placeholder)placeholder.remove();
+  const d=document.createElement('div');
+  d.className='topic-alert topic-alert-new';
+  const t=at?.toDate?at.toDate():new Date();
+  const timeStr=t.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+  const kwHtml=kws.map(k=>`<span class="ta-kw">«${esc(k)}»</span>`).join(' ');
+  d.innerHTML=`<div class="ta-who">👤 ${esc(who)} — ${timeStr}</div><div style="margin-bottom:5px;font-size:12px">ذكر: ${kwHtml}</div><div class="ta-msg">${esc(msg.slice(0,200))}</div>`;
+  box.prepend(d);
+  setTimeout(()=>d.classList.remove('topic-alert-new'),3000);
+  // تنبيه سريع
+  try{if(Notification.permission==='granted')new Notification('🎯 موضوع هام: '+kws.join('، '),{body:who+': '+msg.slice(0,80)});}catch(e){}
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  renderTopicTags();
+  const inp=$('topicIn'),addBtn=$('topicAdd'),clr=$('topicClear');
+  if(inp&&addBtn){
+    const doAdd=()=>{const v=inp.value.trim();if(!v)return;if(!topicKws.includes(v))topicKws.push(v);inp.value='';topicSave();};
+    addBtn.onclick=doAdd;
+    inp.onkeydown=e=>{if(e.key==='Enter')doAdd();};
+  }
+  if(clr)clr.onclick=()=>{$('topicAlerts').innerHTML='<div style="color:#6b7590;font-size:14px;text-align:center;padding:20px">لا يوجد تنبيهات بعد</div>';topicAlertsSeen.clear();};
+  // إذن الإشعارات
+  if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});
+  // سطح المكتب: اضغط Escape لإغلاق الكاميرا
+  document.onkeydown=e=>{if(e.key==='Escape'){const vb=$('vidBar');if(vb&&vb.classList.contains('show')){vb.classList.remove('show');$('mainWrap')&&$('mainWrap').classList.remove('cam-open');}}};
 });
 // ===== الممثل الوحيد =====
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(s).trim()));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
