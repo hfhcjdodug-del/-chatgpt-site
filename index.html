@@ -125,19 +125,16 @@ select option{background:#121726;color:#fff}
 :root{--top-h:52px;--side-w:64px;--cam-w:380px}
 @media(min-width:900px){
   body{overflow:hidden;height:100vh;height:100dvh}
-  /* الشبكة الرئيسية: شريط علوي + (sidebar | محتوى) */
+  /* الشبكة: شريط علوي + (sidebar | محتوى) */
   #app{
     display:grid!important;
     grid-template-columns:var(--side-w) 1fr;
     grid-template-rows:var(--top-h) 1fr;
     height:100vh;height:100dvh;overflow:hidden
   }
-  .top{
-    grid-column:1/3;grid-row:1;
-    padding:8px 18px;min-height:var(--top-h)
-  }
+  .top{grid-column:1/3;grid-row:1;padding:8px 18px;min-height:var(--top-h)}
   .top h1{font-size:15px}
-  /* شريط التبويبات الجانبي */
+  /* شريط جانبي للتبويبات */
   .tabs{
     grid-column:1;grid-row:2;
     flex-direction:column;width:var(--side-w);
@@ -146,31 +143,31 @@ select option{background:#121726;color:#fff}
     border-right:1px solid var(--bd);border-bottom:none;
     background:rgba(8,11,20,.8);scrollbar-width:none
   }
-  .tab{
-    border-radius:10px!important;padding:8px 4px!important;
-    font-size:9.5px!important;text-align:center;
-    white-space:normal;line-height:1.3;width:54px;flex:none!important
-  }
-  /* منطقة المحتوى: main-scroll | vidBar */
-  .wrap{
-    grid-column:2;grid-row:2;
-    display:flex!important;flex-direction:row;
-    overflow:hidden;padding:0;max-width:none;height:100%
-  }
-  .main-scroll{flex:1;overflow-y:auto;padding:14px;min-width:0;position:relative}
-  /* لوحة الكاميرا: شريط على اليمين */
+  .tab{border-radius:10px!important;padding:8px 4px!important;font-size:9.5px!important;text-align:center;white-space:normal;line-height:1.3;width:54px;flex:none!important}
+  /* منطقة المحتوى */
+  .wrap{grid-column:2;grid-row:2;overflow-y:auto;padding:14px;max-width:none;height:100%}
+  /* الكاميرا: fixed على اليمين (نفس طريقة الجوال لكن مقيّدة بالجانب الأيمن) */
   #vidBar{
-    position:relative!important;inset:auto!important;
+    position:fixed!important;
+    top:var(--top-h)!important;
+    right:0!important;
+    bottom:0!important;
+    left:auto!important;
+    width:var(--cam-w)!important;
     transform:none!important;
-    width:var(--cam-w)!important;flex:none;
-    height:100%!important;
-    border-radius:0!important;background:#05070d;
+    border-radius:0!important;
+    background:#05070d;
     border-left:1px solid var(--bd);
-    overflow-y:auto;display:none!important;
+    z-index:50;
+    padding:10px!important;
+    gap:8px;overflow-y:auto;
+    display:none!important;
     flex-direction:column!important
   }
   #vidBar.show{display:flex!important}
-  /* المحادثة: تملأ منطقة المحتوى بدون تغطية الكاميرا */
+  /* عندما الكاميرا مفتوحة: المحتوى لا يختبئ خلفها */
+  body.cam-open .wrap{padding-right:calc(var(--cam-w) + 14px)}
+  /* المحادثة لا تغطي الكاميرا */
   .chatv{
     position:fixed!important;
     left:var(--side-w)!important;
@@ -179,19 +176,14 @@ select option{background:#121726;color:#fff}
     bottom:0!important;
     width:auto!important
   }
-  /* عندما الكاميرا مفتوحة: اترك مكانها على اليمين */
-  body.cam-open .chatv{
-    right:var(--cam-w)!important
-  }
-  #ocShare{
-    position:fixed!important;
-    left:var(--side-w)!important;
-    right:0!important;
-    top:var(--top-h)!important;
-    bottom:0!important
-  }
+  body.cam-open .chatv{right:var(--cam-w)!important}
+  /* mشاركة الكاميرا */
+  #ocShare{position:fixed!important;left:var(--side-w)!important;right:0!important;top:var(--top-h)!important;bottom:0!important}
   body.cam-open #ocShare{right:var(--cam-w)!important}
   #callBar{left:var(--side-w)!important}
+  /* حجم الفيديو داخل لوحة الكاميرا على الديسكتوب */
+  #vidBar .vwrap{height:220px;aspect-ratio:unset;border-radius:10px}
+  #vidBar .vwrap video{width:100%;height:100%;object-fit:cover}
 }
 /* المواضيع */
 .topic-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(79,140,255,.15);border:1px solid rgba(79,140,255,.35);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700;color:#9db8ff}
