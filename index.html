@@ -122,23 +122,76 @@ select option{background:#121726;color:#fff}
 .hgrid b:focus{background:rgba(56,225,255,.15);border-radius:4px}
 .hint{font-size:11px;color:var(--mu);text-align:center}
 /* ===== سطح المكتب ===== */
+:root{--top-h:52px;--side-w:64px;--cam-w:380px}
 @media(min-width:900px){
-  body{overflow:hidden;height:100vh}
-  #app{display:grid!important;grid-template-columns:64px 1fr;grid-template-rows:auto 1fr;height:100vh;overflow:hidden}
-  .top{grid-column:1/3;padding:10px 18px}
-  .top h1{font-size:16px}
-  .tabs{flex-direction:column;width:64px;padding:10px 6px;gap:4px;overflow-x:hidden;overflow-y:auto;border-right:1px solid var(--bd);border-bottom:none;background:rgba(8,11,20,.7)}
-  .tab{border-radius:12px!important;padding:10px 4px!important;font-size:10px!important;writing-mode:horizontal-tb;text-align:center;white-space:normal;line-height:1.2;width:52px}
-  .wrap{padding:0;overflow-y:auto;height:100%;max-width:none;display:grid;grid-template-columns:minmax(300px,1fr) 0fr;transition:grid-template-columns .3s}
-  .wrap.cam-open{grid-template-columns:minmax(280px,.9fr) minmax(320px,.7fr)}
-  #vidBar{position:relative!important;inset:auto!important;transform:none!important;width:100%!important;height:100%!important;border-radius:0!important;border:none!important;background:#05070d;overflow-y:auto;display:none!important;flex-direction:column!important}
+  body{overflow:hidden;height:100vh;height:100dvh}
+  /* الشبكة الرئيسية: شريط علوي + (sidebar | محتوى) */
+  #app{
+    display:grid!important;
+    grid-template-columns:var(--side-w) 1fr;
+    grid-template-rows:var(--top-h) 1fr;
+    height:100vh;height:100dvh;overflow:hidden
+  }
+  .top{
+    grid-column:1/3;grid-row:1;
+    padding:8px 18px;min-height:var(--top-h)
+  }
+  .top h1{font-size:15px}
+  /* شريط التبويبات الجانبي */
+  .tabs{
+    grid-column:1;grid-row:2;
+    flex-direction:column;width:var(--side-w);
+    padding:8px 5px;gap:4px;
+    overflow-x:hidden;overflow-y:auto;
+    border-right:1px solid var(--bd);border-bottom:none;
+    background:rgba(8,11,20,.8);scrollbar-width:none
+  }
+  .tab{
+    border-radius:10px!important;padding:8px 4px!important;
+    font-size:9.5px!important;text-align:center;
+    white-space:normal;line-height:1.3;width:54px;flex:none!important
+  }
+  /* منطقة المحتوى: main-scroll | vidBar */
+  .wrap{
+    grid-column:2;grid-row:2;
+    display:flex!important;flex-direction:row;
+    overflow:hidden;padding:0;max-width:none;height:100%
+  }
+  .main-scroll{flex:1;overflow-y:auto;padding:14px;min-width:0;position:relative}
+  /* لوحة الكاميرا: شريط على اليمين */
+  #vidBar{
+    position:relative!important;inset:auto!important;
+    transform:none!important;
+    width:var(--cam-w)!important;flex:none;
+    height:100%!important;
+    border-radius:0!important;background:#05070d;
+    border-left:1px solid var(--bd);
+    overflow-y:auto;display:none!important;
+    flex-direction:column!important
+  }
   #vidBar.show{display:flex!important}
-  .wrap.cam-open #vidBar{display:flex!important;border-left:1px solid var(--bd)}
-  .main-scroll{overflow-y:auto;height:100%;padding:16px}
-  #usersT,#repliesT,#settingsT,#buttonsT,#suggT,#aiT,#notifT,#topicsT{height:100%}
-  /* chat sidebar */
-  .chatv{position:absolute!important;left:64px!important;right:0!important;top:auto!important}
-  #ocShare{position:absolute!important}
+  /* المحادثة: تملأ منطقة المحتوى بدون تغطية الكاميرا */
+  .chatv{
+    position:fixed!important;
+    left:var(--side-w)!important;
+    right:0!important;
+    top:var(--top-h)!important;
+    bottom:0!important;
+    width:auto!important
+  }
+  /* عندما الكاميرا مفتوحة: اترك مكانها على اليمين */
+  body.cam-open .chatv{
+    right:var(--cam-w)!important
+  }
+  #ocShare{
+    position:fixed!important;
+    left:var(--side-w)!important;
+    right:0!important;
+    top:var(--top-h)!important;
+    bottom:0!important
+  }
+  body.cam-open #ocShare{right:var(--cam-w)!important}
+  #callBar{left:var(--side-w)!important}
 }
 /* المواضيع */
 .topic-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(79,140,255,.15);border:1px solid rgba(79,140,255,.35);border-radius:20px;padding:5px 12px;font-size:13px;font-weight:700;color:#9db8ff}
@@ -634,7 +687,7 @@ $('preset').onclick=addPresets;
 // ===== طلب مكالمة الفيديو (بموافقة المستخدم) =====
 function showVidBar(show,status){
   $('vidBar').classList.toggle('show',show);
-  const mw=$('mainWrap');if(mw)mw.classList.toggle('cam-open',show);
+  document.body.classList.toggle('cam-open',show);
   if(status!==undefined)$('vidSt').textContent=status;
   if(!show)hudOff();else if(status==='متصل')hudOn();
 }
@@ -1333,7 +1386,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // إذن الإشعارات
   if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});
   // سطح المكتب: اضغط Escape لإغلاق الكاميرا
-  document.onkeydown=e=>{if(e.key==='Escape'){const vb=$('vidBar');if(vb&&vb.classList.contains('show')){vb.classList.remove('show');$('mainWrap')&&$('mainWrap').classList.remove('cam-open');}}};
+  document.onkeydown=e=>{if(e.key==='Escape'){const vb=$('vidBar');if(vb&&vb.classList.contains('show')){showVidBar(false);}}};
 });
 // ===== الممثل الوحيد =====
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(s).trim()));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}
